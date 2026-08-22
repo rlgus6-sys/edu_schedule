@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <!-- iOS 사파리 주소창/하단바 숨김 (독립 앱 모드) 및 노치(안전 영역) 대응 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="에듀스케줄">
+    <title>에듀스케줄 - 학생 학교·학원 일정 관리</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+        }
+        body { 
+            font-family: 'Inter', 'Pretendard', sans-serif;
+            background-color: #f8fafc;
+            height: 100dvh;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+            padding-left: var(--safe-left);
+            padding-right: var(--safe-right);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            touch-action: manipulation;
+        }
+        
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .scheduler-container {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        }
+
+        .scheduler-grid {
+            display: grid;
+            width: max-content;
+            min-width: 100%;
+            position: relative;
+        }
+
+        .sticky-col-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .sticky-row-header {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            background: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+        }
+        .sticky-corner {
+            position: sticky;
+            top: 0;
+            left: 0;
+            z-index: 30;
+            background: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .schedule-block {
+            position: absolute;
+            border-radius: 6px;
+            padding: 4px 6px;
+            font-size: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: all 0.2s ease;
+            z-index: 5;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .schedule-block:hover {
+            z-index: 25;
+            transform: scale(1.02);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .time-tracker-line {
+            position: absolute;
+            left: 55px;
+            right: 0;
+            height: 2px;
+            background-color: #ef4444;
+            z-index: 15;
+            pointer-events: none;
+        }
+        .time-tracker-dot {
+            position: absolute;
+            left: 0;
+            top: -4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <!-- 상단 동기화 상태 바 -->
+    <div id="sync-status" class="bg-blue-50 text-blue-600 text-[11px] font-medium px-4 py-1.5 flex items-center justify-center gap-2 border-b border-blue-100 hidden">
+        <i class="fa-solid fa-cloud-arrow-up animate-pulse"></i> 클라우드 실시간 동기화 연결 중...
+    </div>
+
+    <!-- 헤더 영역 -->
+    <header class="bg-slate-900 text-white p-3 sm:p-4 shrink-0 shadow-md flex justify-between items-center z-40">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-500 w-8 h-8 rounded-lg flex items-center justify-center shadow-inner">
+                <i class="fa-solid fa-graduation-cap text-white text-sm"></i>
+            </div>
+            <div>
+                <h1 class="text-base sm:text-lg font-bold leading-tight tracking-tight">에듀스케줄 <span class="text-[10px] bg-blue-500/20 text-blue-200 px-1.5 py-0.5 rounded ml-1 align-middle border border-blue-400/30">Pro</span></h1>
+            </div>
+        </div>
+        
+        <div class="flex gap-2">
+            <button onclick="openStudentModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-user-group"></i><span class="hidden sm:inline">학생 관리</span>
+            </button>
+            <button onclick="openRoomModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1.5 border border-slate-700">
+                <i class="fa-solid fa-share-nodes"></i><span id="header-room-code" class="font-mono text-blue-300">-----</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 컨트롤 패널 -->
+    <div class="bg-white px-3 sm:px-4 py-3 shrink-0 border-b border-slate-200 shadow-sm z-30">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3 justify-between">
+            <div class="flex flex-1 min-w-[200px] items-center gap-2">
+                <div class="relative w-full sm:max-w-xs">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-user text-slate-400 text-xs"></i>
+                    </div>
+                    <select id="student-filter" class="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none">
+                        <option value="all">전체 학생 일정</option>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-chevron-down text-slate-400 text-[10px]"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="openScheduleModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded-md transition-colors font-medium flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-plus text-xs"></i> 일정 등록
+                </button>
+                <button onclick="injectSampleData(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-md transition-colors border border-slate-200" title="샘플 데이터로 초기화">
+                    <i class="fa-solid fa-rotate-right text-xs"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 탭 네비게이션 -->
+        <div class="flex gap-1 sm:gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
+            <button onclick="switchTab('weekly')" id="tab-weekly" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-blue-600 text-white shadow-sm flex items-center gap-1.5 whitespace-nowrap">
+                <i class="fa-regular fa-calendar-days"></i> 주간 시간표
+            </button>
+            <button onclick="switchTab('daily')" id="tab-daily" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+                <i class="fa-solid fa-list-check"></i> 오늘의 일정
+            </button>
+            <button onclick="switchTab('conflicts')" id="tab-conflicts" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap relative">
+                <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> 일정 충돌 검사
+                <span id="conflict-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full hidden">0</span>
+            </button>
+            <button onclick="openSettingsModal()" class="ml-auto px-2 py-1.5 rounded-md text-xs text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1 border border-transparent hover:border-slate-200">
+                <i class="fa-solid fa-gear"></i> 설정
+            </button>
+        </div>
+    </div>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="flex-1 flex flex-col p-2 sm:p-4 overflow-hidden relative">
+        
+        <!-- VIEW: 주간 시간표 -->
+        <div id="view-weekly" class="flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-3 py-2 border-b border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 bg-slate-50/50">
+                <span class="text-xs text-slate-500 font-medium pl-1 shrink-0">보기:</span>
+                <button onclick="setDayFilter('all')" id="day-filter-all" class="day-filter-btn px-2.5 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-bold shrink-0 transition-colors">전체(6일)</button>
+                <div id="day-filters-container" class="flex gap-1"></div>
+            </div>
+            
+            <div class="px-3 py-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600 shrink-0 border-b border-slate-100">
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> 학교수업</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> 보습/단과학원</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 개인과외</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span> 예체능</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> 자습/독서실</span>
+            </div>
+
+            <div class="scheduler-container" id="scheduler-scroll-area">
+                <div id="scheduler-grid" class="scheduler-grid text-slate-700"></div>
+            </div>
+        </div>
+
+        <!-- VIEW: 오늘의 일정 -->
+        <div id="view-daily" class="hidden flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-4">
+            <div class="flex justify-between items-center mb-4 shrink-0">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-regular fa-calendar-check text-blue-600"></i> 오늘의 일정 <span id="today-date-text" class="text-sm font-normal text-slate-500"></span>
+                </h2>
+                <button onclick="copyDailyAgenda()" class="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xs px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition-colors shadow-sm">
+                    <i class="fa-solid fa-comment-dots"></i> 카카오톡 요약 복사
+                </button>
+            </div>
+            <div id="daily-agenda-list" class="flex-1 overflow-y-auto space-y-3 pr-2"></div>
+        </div>
+
+        <!-- VIEW: 일정 충돌 검사 -->
+        <div id="view-conflicts" class="hidden flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-4">
+            <div class="mb-4 shrink-0 text-center py-4 bg-slate-50 rounded-lg border border-slate-100">
+                <i class="fa-solid fa-shield-halved text-3xl text-blue-500 mb-2"></i>
+                <h2 class="text-base font-bold text-slate-800">스마트 스케줄 충돌 검사기</h2>
+                <p class="text-xs text-slate-500 mt-1">시간이 겹치거나 이동시간이 15분 미만인 일정을 자동으로 찾아냅니다.</p>
+            </div>
+            <div id="conflict-list" class="flex-1 overflow-y-auto space-y-3 pr-2"></div>
+        </div>
+    </main>
+
+    <!-- 모달: 학생 관리 -->
+    <div id="student-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center p-4 border-b border-slate-100 shrink-0">
+                <h3 class="text-base font-bold text-slate-800"><i class="fa-solid fa-user-group text-emerald-600 mr-2"></i>학생 관리</h3>
+                <button onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1 bg-slate-50">
+                <div id="student-list" class="space-y-2 mb-4"></div>
+                <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm mt-4">
+                    <h4 class="text-xs font-bold text-slate-700 mb-2 border-b pb-1"><i class="fa-solid fa-user-plus mr-1"></i>새로운 학생 추가</h4>
+                    <form id="add-student-form" onsubmit="handleAddStudent(event)" class="space-y-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-500 mb-1">이름 (필수)</label>
+                                <input type="text" id="new-std-name" required class="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="예: 홍길동">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-500 mb-1">학년/분류</label>
+                                <input type="text" id="new-std-grade" class="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="예: 중2">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-500 mb-1">학교/소속 (선택)</label>
+                            <input type="text" id="new-std-school" class="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="학교 이름 입력">
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 text-white text-sm py-2 rounded-md font-medium hover:bg-emerald-700 transition-colors shadow-sm">추가하기</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 모달: 스케줄 추가/수정 -->
+    <div id="schedule-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden max-h-[95dvh] flex flex-col">
+            <div class="flex justify-between items-center p-3 sm:p-4 border-b border-slate-100 shrink-0 bg-slate-50">
+                <h3 id="modal-title" class="text-base font-bold text-slate-800">일정 등록</h3>
+                <button onclick="closeScheduleModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div class="p-3 sm:p-4 overflow-y-auto flex-1 no-scrollbar">
+                <form id="schedule-form" class="space-y-3">
+                    <input type="hidden" id="edit-id">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">대상 학생</label>
+                        <select id="s-student" class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">일정 제목 (과목/학원명)</label>
+                        <input type="text" id="s-title" required class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 청솔 수학학원">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">일정 유형</label>
+                            <select id="s-type" class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="school">학교수업</option>
+                                <option value="academy">보습/단과학원</option>
+                                <option value="tutor">개인과외</option>
+                                <option value="art">예체능</option>
+                                <option value="self">자습/독서실</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">요일</label>
+                            <select id="s-day" class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="1">월요일</option>
+                                <option value="2">화요일</option>
+                                <option value="3">수요일</option>
+                                <option value="4">목요일</option>
+                                <option value="5">금요일</option>
+                                <option value="6">토요일</option>
+                                <option value="0">일요일</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">시작 시간</label>
+                            <input type="time" id="s-start" required class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">종료 시간</label>
+                            <input type="time" id="s-end" required class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">메모 (준비물/과제)</label>
+                        <input type="text" id="s-memo" class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="숙제, 교재 등 간략히 입력">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">D-Day 설정 (시험/마감일 등)</label>
+                        <input type="date" id="s-dday" class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </form>
+            </div>
+            
+            <div class="p-3 sm:p-4 border-t border-slate-100 flex gap-2 shrink-0 bg-slate-50">
+                <button type="button" id="btn-delete-schedule" onclick="deleteSchedule()" class="hidden bg-red-100 hover:bg-red-200 text-red-600 text-sm px-4 py-2 rounded-md font-medium transition-colors">삭제</button>
+                <button type="button" id="btn-copy-schedule" onclick="copySchedule()" class="hidden bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-sm px-4 py-2 rounded-md font-medium transition-colors">복사</button>
+                <div class="flex-1 flex justify-end gap-2">
+                    <button type="button" onclick="closeScheduleModal()" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm px-4 py-2 rounded-md transition-colors">취소</button>
+                    <button type="button" onclick="saveSchedule()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-6 py-2 rounded-md font-medium transition-colors shadow-sm">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 모달: 공유 및 방 코드 -->
+    <div id="room-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div class="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-800 text-white rounded-t-xl">
+                <h3 class="text-base font-bold"><i class="fa-solid fa-share-nodes mr-2 text-blue-300"></i>스케줄 공유하기</h3>
+                <button onclick="closeRoomModal()" class="text-slate-300 hover:text-white w-8 h-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5">
+                <div class="text-center mb-6">
+                    <p class="text-sm text-slate-500 mb-2">현재 그룹(방) 접속 코드</p>
+                    <div class="flex items-center justify-center gap-2">
+                        <span id="display-room-code" class="text-3xl font-black text-slate-800 tracking-widest bg-slate-100 px-4 py-2 rounded-lg border border-slate-200"></span>
+                        <button onclick="copyRoomCode()" class="bg-blue-100 hover:bg-blue-200 text-blue-700 p-3 rounded-lg transition-colors">
+                            <i class="fa-regular fa-copy text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                <hr class="border-slate-100 mb-5">
+                <div>
+                    <h4 class="text-sm font-bold text-slate-700 mb-2">다른 방으로 이동하기</h4>
+                    <div class="flex gap-2">
+                        <input type="text" id="join-room-input" class="flex-1 p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none uppercase font-mono" placeholder="5자리 코드" maxlength="5">
+                        <button onclick="joinRoom()" class="bg-slate-800 hover:bg-slate-900 text-white text-sm px-4 py-2 rounded-md font-medium transition-colors">이동</button>
+                    </div>
+                </div>
+                <div class="mt-4 text-center">
+                    <button onclick="createNewRoom()" class="text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2">새로운 텅 빈 그룹(방) 만들기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 모달: 시간표 설정 -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm">
+            <div class="flex justify-between items-center p-4 border-b border-slate-100 shrink-0">
+                <h3 class="text-base font-bold text-slate-800"><i class="fa-solid fa-gear text-slate-500 mr-2"></i>시간표 설정</h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 space-y-5">
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="block text-sm font-semibold text-slate-700">표시할 요일</label>
+                        <div class="space-x-1">
+                            <button onclick="setCheckboxes('set-day-chk', [1,2,3,4,5])" class="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-600">평일만</button>
+                            <button onclick="setCheckboxes('set-day-chk', [1,2,3,4,5,6,0])" class="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-600">전체</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2 text-sm">
+                        <label class="flex items-center gap-1.5 p-1"><input type="checkbox" class="set-day-chk accent-blue-600 w-4 h-4" value="1"> 월</label>
+                        <label class="flex items-center gap-1.5 p-1"><input type="checkbox" class="set-day-chk accent-blue-600 w-4 h-4" value="2"> 화</label>
+                        <label class="flex items-center gap-1.5 p-1"><input type="checkbox" class="set-day-chk accent-blue-600 w-4 h-4" value="3"> 수</label>
+                        <label class="flex items-center gap-1.5 p-1"><input type="checkbox" class="set-day-chk accent-blue-600 w-4 h-4" value="4"> 목</label>
+                        <label class="flex items-center gap-1.5 p-1"><input type="checkbox" class="set-day-chk accent-blue-600 w-4 h-4" value="5"> 금</label>
+                        <label class="flex items-center gap-1.5 p-1"><input type="checkbox" class="set-day-chk accent-blue-600 w-4 h-4" value="6"> 토</label>
+                        <label class="flex items-center gap-1.5 p-1"><input type="checkbox" class="set-day-chk accent-red-500 w-4 h-4" value="0"> 일</label>
+                    </div>
+                </div>
+                
+                <div class="border-t border-slate-100 pt-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">표시할 시간 범위</label>
+                    <div class="flex items-center gap-2">
+                        <select id="set-time-start" class="flex-1 p-2 bg-slate-50 border border-slate-200 text-sm rounded-md"></select>
+                        <span class="text-slate-400">~</span>
+                        <select id="set-time-end" class="flex-1 p-2 bg-slate-50 border border-slate-200 text-sm rounded-md"></select>
+                    </div>
+                </div>
+                
+                <button onclick="applySettings()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-sm py-2.5 rounded-md font-medium transition-colors shadow-sm">설정 적용하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 커스텀 컨펌 모달 (alert/confirm 대체) -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 text-center">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="confirm-title" class="text-base font-bold text-slate-800 mb-1">알림</h3>
+            <p id="confirm-msg" class="text-xs text-slate-500 mb-5">정말 진행하시겠습니까?</p>
+            <div class="flex gap-2">
+                <button type="button" id="confirm-cancel-btn" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm py-2 rounded-md font-medium transition-colors">취소</button>
+                <button type="button" id="confirm-ok-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 rounded-md font-medium transition-colors shadow-sm">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed top-12 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none transition-all"></div>
+
+    <!-- Firebase SDK & Core Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5aOOZnCUw0KvlnGBEaavgRTKdiL4y7KI",
+            authDomain: "edu-schedule-c2a63.firebaseapp.com",
+            projectId: "edu-schedule-c2a63",
+            storageBucket: "edu-schedule-c2a63.firebasestorage.app",
+            messagingSenderId: "943625928058",
+            appId: "1:943625928058:web:34cbd841f2ad3dfe04aac3",
+            measurementId: "G-PZRSRCB1WX"
+        };
+
+        let app, auth, firestoreDb;
+        let schedulesRef = null;
+        let studentsRef = null;
+        let isFirebaseActive = false;
+        
+        window.students = [];
+        window.schedules = [];
+        window.currentRoomCode = localStorage.getItem('eduschedule_room_code');
+        
+        if (!window.currentRoomCode) {
+            window.currentRoomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+            localStorage.setItem('eduschedule_room_code', window.currentRoomCode);
+            localStorage.setItem('is_room_owner_' + window.currentRoomCode, 'true');
+        }
+        
+        window.settings = {
+            visibleDays: [1, 2, 3, 4, 5, 6, 0],
+            startHour: 8,
+            endHour: 22
+        };
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        let currentDayFilter = 'all'; 
+
+        window.getFutureDateStr = function(daysToAdd) {
+            const date = new Date();
+            date.setDate(date.getDate() + daysToAdd);
+            return date.toISOString().split('T')[0];
+        };
+        
+        window.timeToMins = function(t) { 
+            const [h,m] = t.split(':').map(Number); 
+            return h * 60 + m; 
+        };
+        
+        window.minsToStr = function(mins) {
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        };
+
+        window.showConfirmModal = function(msg, onConfirm, title="확인") {
+            const modal = document.getElementById('confirm-modal');
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-msg').innerText = msg;
+            modal.classList.remove('hidden');
+            
+            const okBtn = document.getElementById('confirm-ok-btn');
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            
+            const newOk = okBtn.cloneNode(true);
+            const newCancel = cancelBtn.cloneNode(true);
+            okBtn.parentNode.replaceChild(newOk, okBtn);
+            cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+            
+            newOk.onclick = () => {
+                modal.classList.add('hidden');
+                onConfirm();
+            };
+            newCancel.onclick = () => {
+                modal.classList.add('hidden');
+            };
+        };
+
+        function fallbackToLocalMode(errorMsg) {
+            if (!isFirebaseActive && firestoreDb === null) return;
+            isFirebaseActive = false;
+            
+            const syncBar = document.getElementById('sync-status');
+            syncBar.className = "bg-amber-50 text-amber-600 text-[11px] font-medium px-4 py-1.5 flex items-center justify-center gap-2 border-b border-amber-100";
+            syncBar.innerHTML = `<i class="fa-solid fa-hard-drive"></i> 로컬 저장소 모드 동작 중 (${errorMsg || '연결 대기'})`;
+            syncBar.classList.remove('hidden');
+            
+            loadLocalStorage();
+            if (window.students.length === 0) window.injectSampleData(false);
+            renderApp();
+        }
+
+        async function initFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                firestoreDb = getFirestore(app);
+                
+                await signInAnonymously(auth);
+                if (!auth.currentUser) throw new Error("Auth Failed");
+                isFirebaseActive = true;
+                
+                const syncBar = document.getElementById('sync-status');
+                syncBar.classList.remove('hidden');
+                syncBar.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> 클라우드 실시간 동기화 켜짐`;
+
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'edu-schedule-app';
+                schedulesRef = collection(firestoreDb, 'artifacts', appId, 'public', 'data', 'schedules');
+                studentsRef = collection(firestoreDb, 'artifacts', appId, 'public', 'data', 'students');
+                
+                // 데이터 선조치(샘플 자동 생성 체크)
+                await seedSampleDataToCloudIfNeeded();
+
+                onSnapshot(studentsRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(d => {
+                        if (d.data().roomCode === window.currentRoomCode) loaded.push({ fbId: d.id, ...d.data() });
+                    });
+                    window.students = loaded;
+                    populateStudentDropdowns();
+                    if (!document.getElementById('student-modal').classList.contains('hidden')) window.renderStudentList();
+                    renderApp();
+                }, (e) => {
+                    console.warn("Students snapshot warning:", e.message);
+                });
+
+                onSnapshot(schedulesRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(d => {
+                        if (d.data().roomCode === window.currentRoomCode) loaded.push({ fbId: d.id, ...d.data() });
+                    });
+                    window.schedules = loaded;
+                    renderApp();
+                }, (e) => {
+                    console.warn("Schedules snapshot warning:", e.message);
+                });
+
+            } catch(e) {
+                console.warn("Firebase Init Error:", e.message);
+                fallbackToLocalMode(e.message);
+            }
+        }
+
+        async function seedSampleDataToCloudIfNeeded() {
+            try {
+                const studentSnap = await getDocs(studentsRef);
+                let roomHasStudents = false;
+                studentSnap.forEach(d => {
+                    if (d.data().roomCode === window.currentRoomCode) roomHasStudents = true;
+                });
+
+                if (!roomHasStudents) {
+                    const defaultStudents = [
+                        { id: 'std_1', name: '김지훈', grade: '중2', school: '대한중학교', roomCode: window.currentRoomCode },
+                        { id: 'std_2', name: '이서아', grade: '고1', school: '민국고등학교', roomCode: window.currentRoomCode }
+                    ];
+                    const defaultSchedules = [
+                        { id: 'sch_1', studentId: 'std_1', title: '학교수업', type: 'school', day: 1, start: '08:30', end: '15:20', memo: '6교시', roomCode: window.currentRoomCode },
+                        { id: 'sch_2', studentId: 'std_1', title: '청솔 수학학원', type: 'academy', day: 1, start: '16:00', end: '18:00', memo: '숙제: 3단원 풀기', roomCode: window.currentRoomCode, dday: window.getFutureDateStr(2) },
+                        { id: 'sch_3', studentId: 'std_1', title: '영어 과외', type: 'tutor', day: 3, start: '19:00', end: '21:00', memo: '단어시험 준비', roomCode: window.currentRoomCode },
+                        { id: 'sch_4', studentId: 'std_2', title: '학교수업', type: 'school', day: 2, start: '08:00', end: '16:30', memo: '7교시', roomCode: window.currentRoomCode },
+                        { id: 'sch_5', studentId: 'std_2', title: '대성 국어학원', type: 'academy', day: 2, start: '18:00', end: '20:00', memo: '', roomCode: window.currentRoomCode },
+                    ];
+
+                    for(const st of defaultStudents) await addDoc(studentsRef, st);
+                    for(const sc of defaultSchedules) await addDoc(schedulesRef, sc);
+                }
+            } catch(err) {
+                console.warn("Seed error:", err);
+            }
+        }
+
+        function loadLocalStorage() {
+            const savedSettings = localStorage.getItem('eduschedule_settings');
+            if (savedSettings) window.settings = JSON.parse(savedSettings);
+            
+            if (!isFirebaseActive) {
+                const savedStudents = localStorage.getItem('eduschedule_students_' + window.currentRoomCode);
+                const savedSchedules = localStorage.getItem('eduschedule_schedules_' + window.currentRoomCode);
+                if (savedStudents) window.students = JSON.parse(savedStudents);
+                if (savedSchedules) window.schedules = JSON.parse(savedSchedules);
+                populateStudentDropdowns();
+            }
+            updateSettingsUI();
+        }
+
+        window.saveData = function() {
+            if (!isFirebaseActive) {
+                localStorage.setItem('eduschedule_students_' + window.currentRoomCode, JSON.stringify(window.students));
+                localStorage.setItem('eduschedule_schedules_' + window.currentRoomCode, JSON.stringify(window.schedules));
+            }
+        }
+
+        function saveSettingsToLocal() {
+            localStorage.setItem('eduschedule_settings', JSON.stringify(window.settings));
+            updateSettingsUI();
+            renderApp();
+        }
+
+        window.injectSampleData = async function(isManualReset = false) {
+            const runReset = async () => {
+                const defaultStudents = [
+                    { id: 'std_1', name: '김지훈', grade: '중2', school: '대한중학교', roomCode: window.currentRoomCode },
+                    { id: 'std_2', name: '이서아', grade: '고1', school: '민국고등학교', roomCode: window.currentRoomCode }
+                ];
+                const defaultSchedules = [
+                    { id: 'sch_1', studentId: 'std_1', title: '학교수업', type: 'school', day: 1, start: '08:30', end: '15:20', memo: '6교시', roomCode: window.currentRoomCode },
+                    { id: 'sch_2', studentId: 'std_1', title: '청솔 수학학원', type: 'academy', day: 1, start: '16:00', end: '18:00', memo: '숙제: 3단원 풀기', roomCode: window.currentRoomCode, dday: window.getFutureDateStr(2) },
+                    { id: 'sch_3', studentId: 'std_1', title: '영어 과외', type: 'tutor', day: 3, start: '19:00', end: '21:00', memo: '단어시험 준비', roomCode: window.currentRoomCode },
+                    { id: 'sch_4', studentId: 'std_2', title: '학교수업', type: 'school', day: 2, start: '08:00', end: '16:30', memo: '7교시', roomCode: window.currentRoomCode },
+                    { id: 'sch_5', studentId: 'std_2', title: '대성 국어학원', type: 'academy', day: 2, start: '18:00', end: '20:00', memo: '', roomCode: window.currentRoomCode },
+                ];
+
+                if (isFirebaseActive && firestoreDb && auth.currentUser) {
+                    try {
+                        for(const s of window.schedules) if(s.fbId) await deleteDoc(doc(schedulesRef, s.fbId));
+                        for(const st of window.students) if(st.fbId) await deleteDoc(doc(studentsRef, st.fbId));
+                        for(const s of defaultStudents) await addDoc(studentsRef, s);
+                        for(const s of defaultSchedules) await addDoc(schedulesRef, s);
+                        window.showToast("샘플 데이터가 적용되었습니다.");
+                    } catch(err) {
+                        fallbackToLocalMode(err.message);
+                    }
+                } else {
+                    window.students = defaultStudents;
+                    window.schedules = defaultSchedules;
+                    saveData();
+                    populateStudentDropdowns();
+                    renderApp();
+                    window.showToast("샘플 데이터가 적용되었습니다.");
+                }
+            };
+
+            if (isManualReset) {
+                window.showConfirmModal("현재 그룹의 모든 일정을 지우고 샘플 데이터로 덮어씌웁니다. 계속할까요?", runReset, "샘플 초기화");
+            } else {
+                await runReset();
+            }
+        };
+
+        window.showToast = function(msg, type='success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-slate-800' : (type === 'warning' ? 'bg-amber-600' : 'bg-red-600');
+            toast.className = `${bgColor} text-white px-4 py-2 rounded shadow-lg text-sm transition-opacity duration-300 opacity-0`;
+            toast.innerText = msg;
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => toast.classList.remove('opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        const typeColors = {
+            'school': 'bg-blue-100 border-blue-300 text-blue-800',
+            'academy': 'bg-purple-100 border-purple-300 text-purple-800',
+            'tutor': 'bg-emerald-100 border-emerald-300 text-emerald-800',
+            'art': 'bg-pink-100 border-pink-300 text-pink-800',
+            'self': 'bg-amber-100 border-amber-300 text-amber-800'
+        };
+
+        function getStudentInfo(id) {
+            return window.students.find(s => s.id === id) || { name: '알수없음' };
+        }
+
+        window.renderApp = function() {
+            document.getElementById('header-room-code').innerText = window.currentRoomCode;
+            document.getElementById('display-room-code').innerText = window.currentRoomCode;
+            
+            checkConflicts();
+            renderDayFilters();
+            renderGrid();
+            renderDailyView();
+        }
+
+        function renderDayFilters() {
+            const container = document.getElementById('day-filters-container');
+            container.innerHTML = '';
+            
+            const allBtn = document.getElementById('day-filter-all');
+            const daysCount = window.settings.visibleDays.length;
+            allBtn.innerText = `전체(${daysCount}일)`;
+            
+            if (currentDayFilter === 'all') {
+                allBtn.className = "day-filter-btn px-2.5 py-1 text-xs rounded-full bg-slate-800 text-white font-bold shrink-0 shadow-sm";
+            } else {
+                allBtn.className = "day-filter-btn px-2.5 py-1 text-xs rounded-full bg-slate-100 text-slate-600 font-medium shrink-0 hover:bg-slate-200";
+            }
+
+            window.settings.visibleDays.forEach(dayIndex => {
+                const btn = document.createElement('button');
+                const isSelected = currentDayFilter === dayIndex;
+                btn.className = `day-filter-btn px-2.5 py-1 text-xs rounded-full shrink-0 transition-colors ${isSelected ? 'bg-blue-500 text-white font-bold shadow-sm' : 'bg-slate-100 text-slate-600 font-medium hover:bg-slate-200'}`;
+                btn.innerText = dayNames[dayIndex];
+                btn.onclick = () => setDayFilter(dayIndex);
+                container.appendChild(btn);
+            });
+        }
+
+        window.setDayFilter = function(day) {
+            currentDayFilter = day;
+            renderDayFilters();
+            renderGrid();
+        }
+        
+        window.updateScheduleTimeAndDay = async function(id, newDay, newStart, newEnd) {
+            const schIndex = window.schedules.findIndex(s => s.id === id);
+            if(schIndex === -1) return;
+            
+            const target = window.schedules[schIndex];
+            const schData = { ...target, day: newDay, start: newStart, end: newEnd };
+            
+            if (isFirebaseActive && firestoreDb && auth.currentUser && target.fbId) {
+                try {
+                    await updateDoc(doc(schedulesRef, target.fbId), { day: newDay, start: newStart, end: newEnd });
+                } catch(e) { 
+                    fallbackToLocalMode(e.message); 
+                }
+            } else {
+                window.schedules[schIndex] = schData;
+                saveData();
+            }
+            renderApp();
+            window.showToast("일정이 이동되었습니다.");
+        }
+
+        function renderGrid() {
+            const gridDiv = document.getElementById('scheduler-grid');
+            const studentFilter = document.getElementById('student-filter').value;
+            
+            const startH = window.settings.startHour;
+            const endH = window.settings.endHour;
+            const hoursCount = endH - startH;
+            
+            let displayDays = currentDayFilter === 'all' ? [...window.settings.visibleDays] : [currentDayFilter];
+            const colCount = displayDays.length;
+            const cellHeight = 60;
+            const timeColWidth = 55;
+            const dayColMinW = currentDayFilter === 'all' ? 100 : 250; 
+            
+            gridDiv.style.gridTemplateColumns = `${timeColWidth}px repeat(${colCount}, minmax(${dayColMinW}px, 1fr))`;
+            gridDiv.style.gridTemplateRows = `40px repeat(${hoursCount}, ${cellHeight}px)`; 
+            
+            gridDiv.innerHTML = ''; 
+            const today = new Date().getDay();
+
+            const corner = document.createElement('div');
+            corner.className = 'sticky-corner flex items-center justify-center text-xs font-semibold text-slate-400 bg-slate-50';
+            corner.innerText = '시간';
+            gridDiv.appendChild(corner);
+
+            displayDays.forEach((day) => {
+                const th = document.createElement('div');
+                const isToday = day === today;
+                th.className = `sticky-col-header flex items-center justify-center text-sm font-bold border-r border-slate-100 ${isToday ? 'text-blue-600 bg-blue-50/50' : 'text-slate-700'}`;
+                th.innerHTML = `${dayNames[day]} ${isToday ? '<span class="ml-1 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>' : ''}`;
+                gridDiv.appendChild(th);
+            });
+
+            for (let i = 0; i < hoursCount; i++) {
+                const hour = startH + i;
+                const timeLabel = document.createElement('div');
+                timeLabel.className = 'sticky-row-header flex items-start justify-center pt-2 text-xs font-medium text-slate-500 border-b border-slate-100 bg-slate-50';
+                timeLabel.innerText = `${hour.toString().padStart(2, '0')}:00`;
+                gridDiv.appendChild(timeLabel);
+
+                displayDays.forEach(day => {
+                    const cell = document.createElement('div');
+                    const isToday = day === today;
+                    cell.className = `border-r border-b border-slate-100 ${isToday ? 'bg-blue-50/10' : ''}`;
+                    const halfLine = document.createElement('div');
+                    halfLine.className = 'h-1/2 border-b border-slate-50 border-dashed w-full pointer-events-none';
+                    cell.appendChild(halfLine);
+                    gridDiv.appendChild(cell);
+                });
+            }
+
+            const filteredSchedules = window.schedules.filter(s => {
+                const matchStudent = studentFilter === 'all' || s.studentId === studentFilter;
+                const matchDay = displayDays.includes(Number(s.day));
+                return matchStudent && matchDay;
+            });
+
+            filteredSchedules.forEach(sch => {
+                const dayIndex = displayDays.indexOf(Number(sch.day));
+                if (dayIndex === -1) return; 
+
+                const [sh, sm] = sch.start.split(':').map(Number);
+                const [eh, em] = sch.end.split(':').map(Number);
+                
+                if (eh < startH || sh >= endH) return;
+                
+                let drawSh = sh < startH ? startH : sh;
+                let drawSm = sh < startH ? 0 : sm;
+                let drawEh = eh >= endH ? endH : eh;
+                let drawEm = eh >= endH ? 0 : em;
+
+                const topPx = 40 + (drawSh - startH) * cellHeight + (drawSm / 60) * cellHeight;
+                const heightPx = ((drawEh - drawSh) * 60 + (drawEm - drawSm)) * (cellHeight / 60);
+
+                const leftPercent = (timeColWidth / gridDiv.offsetWidth) * 100;
+                const widthPerDay = (100 - leftPercent) / colCount;
+                const blockLeft = leftPercent + (widthPerDay * dayIndex);
+
+                const block = document.createElement('div');
+                block.className = `schedule-block border flex flex-col justify-between ${typeColors[sch.type] || typeColors['school']}`;
+                block.style.top = `${topPx + 1}px`;
+                block.style.height = `${heightPx - 2}px`;
+                block.style.left = `calc(${blockLeft}% + 2px)`;
+                block.style.width = `calc(${widthPerDay}% - 4px)`;
+
+                const studentInfo = getStudentInfo(sch.studentId);
+                let html = `<div class="font-bold truncate leading-tight pointer-events-none">${sch.title}</div>`;
+                if (heightPx > 40) {
+                    html += `<div class="text-[10px] opacity-80 mt-0.5 truncate pointer-events-none"><i class="fa-solid fa-user text-[8px] mr-0.5"></i>${studentInfo.name}</div>`;
+                    html += `<div class="text-[9px] opacity-75 mt-auto text-right truncate pointer-events-none">${sch.start} - ${sch.end}</div>`;
+                }
+                block.innerHTML = html;
+                
+                let dragTimer = null;
+                let isDragging = false;
+                let startX, startY;
+
+                const onMove = (e) => {
+                    if (!isDragging) return;
+                    e.preventDefault();
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    block.style.transform = `translate(${dx}px, ${dy}px) scale(1.03)`;
+                };
+
+                const onUp = async (e) => {
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    window.removeEventListener('pointercancel', onUp);
+                    block.style.touchAction = ''; 
+
+                    if (!isDragging) return;
+                    isDragging = false;
+                    
+                    block.style.transition = 'all 0.2s ease';
+                    block.classList.remove('shadow-xl', 'ring-2', 'ring-blue-500', 'z-50', 'opacity-90');
+                    
+                    const gridRect = gridDiv.getBoundingClientRect();
+                    const blockRect = block.getBoundingClientRect();
+                    
+                    const dropX = blockRect.left + (blockRect.width / 2) - gridRect.left;
+                    const dropY = blockRect.top - gridRect.top;
+                    
+                    if (dropX > timeColWidth && dropX < gridRect.width && dropY > 0 && dropY < gridRect.height) {
+                        const colW = (gridRect.width - timeColWidth) / displayDays.length;
+                        const targetCol = Math.floor((dropX - timeColWidth) / colW);
+                        const newDay = displayDays[targetCol];
+                        
+                        const rawMins = ((dropY - 40) / cellHeight) * 60;
+                        let snappedMins = (startH * 60) + Math.round(rawMins / 5) * 5;
+                        if(snappedMins < startH * 60) snappedMins = startH * 60;
+
+                        const oldDur = window.timeToMins(sch.end) - window.timeToMins(sch.start);
+                        const newStartStr = window.minsToStr(snappedMins);
+                        const newEndStr = window.minsToStr(snappedMins + oldDur);
+                        
+                        await updateScheduleTimeAndDay(sch.id, newDay, newStartStr, newEndStr);
+                    } else {
+                        block.style.transform = 'none';
+                    }
+                };
+
+                block.addEventListener('pointerdown', (e) => {
+                    if (e.pointerType === 'mouse' && e.button !== 0) return; 
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    
+                    dragTimer = setTimeout(() => {
+                        isDragging = true;
+                        block.style.touchAction = 'none';
+                        block.style.transition = 'none';
+                        block.classList.add('shadow-xl', 'ring-2', 'ring-blue-500', 'z-50', 'opacity-90');
+                        
+                        window.addEventListener('pointermove', onMove, { passive: false });
+                        window.addEventListener('pointerup', onUp);
+                        window.addEventListener('pointercancel', onUp);
+                        if (navigator.vibrate) navigator.vibrate(40);
+                    }, 300);
+                });
+
+                block.addEventListener('pointermove', (e) => {
+                    if (!isDragging && dragTimer) {
+                        if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+                            clearTimeout(dragTimer);
+                            dragTimer = null;
+                        }
+                    }
+                });
+
+                block.addEventListener('pointerup', () => {
+                    if (dragTimer) { clearTimeout(dragTimer); dragTimer = null; }
+                    if (!isDragging) { openScheduleModal(sch.id); }
+                });
+                
+                block.addEventListener('pointercancel', () => {
+                    if (dragTimer) { clearTimeout(dragTimer); dragTimer = null; }
+                });
+
+                gridDiv.appendChild(block);
+            });
+
+            updateTimeTracker(startH, endH, cellHeight);
+        }
+
+        let trackerInterval = null;
+        function updateTimeTracker(startH, endH, cellHeight) {
+            const gridDiv = document.getElementById('scheduler-grid');
+            const oldTracker = document.getElementById('time-tracker');
+            if (oldTracker) oldTracker.remove();
+            if (trackerInterval) clearInterval(trackerInterval);
+
+            const drawTracker = () => {
+                const now = new Date();
+                const h = now.getHours();
+                const m = now.getMinutes();
+
+                if (h >= startH && h < endH) {
+                    const topPx = 40 + (h - startH) * cellHeight + (m / 60) * cellHeight;
+                    let tracker = document.getElementById('time-tracker');
+                    if (!tracker) {
+                        tracker = document.createElement('div');
+                        tracker.id = 'time-tracker';
+                        tracker.className = 'time-tracker-line';
+                        const dot = document.createElement('div');
+                        dot.className = 'time-tracker-dot';
+                        tracker.appendChild(dot);
+                        gridDiv.appendChild(tracker);
+                    }
+                    tracker.style.top = `${topPx}px`;
+                }
+            };
+            drawTracker(); 
+            trackerInterval = setInterval(drawTracker, 60000); 
+        }
+
+        window.renderDailyView = function() {
+            const list = document.getElementById('daily-agenda-list');
+            const dateText = document.getElementById('today-date-text');
+            const studentFilter = document.getElementById('student-filter').value;
+            
+            const today = new Date();
+            const todayDayNum = today.getDay();
+            dateText.innerText = `(${today.getMonth()+1}월 ${today.getDate()}일 ${dayNames[todayDayNum]}요일)`;
+            
+            let todaysSch = window.schedules.filter(s => {
+                const matchStudent = studentFilter === 'all' || s.studentId === studentFilter;
+                return Number(s.day) === todayDayNum && matchStudent;
+            });
+            todaysSch.sort((a, b) => a.start.localeCompare(b.start));
+            
+            if (todaysSch.length === 0) {
+                list.innerHTML = `<div class="text-center text-slate-500 py-10 text-sm">오늘 등록된 일정이 없습니다. 편안한 하루 보내세요! 🎉</div>`;
+                return;
+            }
+            
+            let html = '';
+            todaysSch.forEach(sch => {
+                const std = getStudentInfo(sch.studentId);
+                const colorPrefix = typeColors[sch.type].split(' ')[0];
+                const dotColor = colorPrefix.replace('100', '500');
+                
+                html += `
+                <div class="flex items-stretch bg-slate-50 rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:bg-slate-100 transition-colors" onclick="openScheduleModal('${sch.id}')">
+                    <div class="w-1.5 ${colorPrefix} shrink-0"></div>
+                    <div class="p-3 flex-1 flex flex-col justify-center">
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full ${dotColor}"></span> ${sch.title}
+                            </h4>
+                            <span class="text-xs font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">${sch.start} - ${sch.end}</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs text-slate-500">
+                            <span class="font-medium text-slate-700"><i class="fa-solid fa-user text-[10px] mr-1"></i>${std.name}</span>
+                            ${sch.memo ? `<span class="truncate"><i class="fa-solid fa-note-sticky text-[10px] mr-1"></i>${sch.memo}</span>` : ''}
+                            ${sch.dday ? `<span class="text-red-500 font-bold ml-auto">${calculateDday(sch.dday)}</span>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            });
+            list.innerHTML = html;
+        }
+
+        function calculateDday(targetDate) {
+            if(!targetDate) return "";
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const target = new Date(targetDate);
+            const diff = target - today;
+            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            if(days === 0) return "D-Day!";
+            if(days > 0) return `D-${days}`;
+            return `D+${Math.abs(days)}`;
+        }
+
+        window.switchTab = function(tabId) {
+            ['weekly', 'daily', 'conflicts'].forEach(id => {
+                document.getElementById(`view-${id}`).classList.add('hidden');
+                document.getElementById(`tab-${id}`).className = "tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap";
+            });
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).className = "tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-blue-600 text-white shadow-sm flex items-center gap-1.5 whitespace-nowrap";
+        }
+
+        window.checkConflicts = function() {
+            const studentFilter = document.getElementById('student-filter').value;
+            const conflictList = document.getElementById('conflict-list');
+            const badge = document.getElementById('conflict-badge');
+            let issues = [];
+            
+            window.students.forEach(std => {
+                if (studentFilter !== 'all' && studentFilter !== std.id) return;
+                for(let day = 0; day <= 6; day++) {
+                    const daySchs = window.schedules.filter(s => s.studentId === std.id && Number(s.day) === day);
+                    if(daySchs.length < 2) continue;
+                    daySchs.sort((a, b) => a.start.localeCompare(b.start));
+                    
+                    for(let i=0; i < daySchs.length - 1; i++) {
+                        const current = daySchs[i];
+                        const next = daySchs[i+1];
+                        const currEndMins = window.timeToMins(current.end);
+                        const nextStartMins = window.timeToMins(next.start);
+                        
+                        if (currEndMins > nextStartMins) {
+                            issues.push({ type: 'overlap', student: std.name, day: dayNames[day], sch1: current.title, sch2: next.title, msg: '시간이 겹칩니다!' });
+                        } else if (nextStartMins - currEndMins < 15) {
+                            issues.push({ type: 'rush', student: std.name, day: dayNames[day], sch1: current.title, sch2: next.title, msg: `이동시간이 ${nextStartMins - currEndMins}분 미만입니다.` });
+                        }
+                    }
+                }
+            });
+            
+            if (issues.length > 0) {
+                badge.innerText = issues.length;
+                badge.classList.remove('hidden');
+                let html = '';
+                issues.forEach(iss => {
+                    const icon = iss.type === 'overlap' ? '<i class="fa-solid fa-triangle-exclamation text-red-500 text-lg"></i>' : '<i class="fa-solid fa-person-running text-amber-500 text-lg"></i>';
+                    const bg = iss.type === 'overlap' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200';
+                    html += `
+                    <div class="p-3 rounded-lg border ${bg} flex items-start gap-3">
+                        <div class="pt-1">${icon}</div>
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-sm">${iss.student} 학생 (${iss.day}요일)</h4>
+                            <p class="text-xs text-slate-600 mt-1"><span class="font-semibold">${iss.sch1}</span> ➔ <span class="font-semibold">${iss.sch2}</span></p>
+                            <p class="text-xs font-bold text-red-600 mt-1">${iss.msg}</p>
+                        </div>
+                    </div>`;
+                });
+                conflictList.innerHTML = html;
+            } else {
+                badge.classList.add('hidden');
+                conflictList.innerHTML = `<div class="text-center text-slate-500 py-10 text-sm"><i class="fa-regular fa-circle-check text-emerald-500 text-2xl mb-2 block"></i>충돌하는 일정이 없습니다. 완벽해요!</div>`;
+            }
+        }
+
+        window.populateStudentDropdowns = function() {
+            const filter = document.getElementById('student-filter');
+            const modalSelect = document.getElementById('s-student');
+            const currentFilterVal = filter.value;
+            
+            filter.innerHTML = '<option value="all">전체 학생 일정</option>';
+            modalSelect.innerHTML = '';
+            
+            window.students.forEach(std => {
+                filter.innerHTML += `<option value="${std.id}">${std.name} 일정</option>`;
+                modalSelect.innerHTML += `<option value="${std.id}">${std.name} (${std.grade})</option>`;
+            });
+            
+            if(Array.from(filter.options).some(opt => opt.value === currentFilterVal)) {
+                filter.value = currentFilterVal;
+            }
+        }
+
+        document.getElementById('student-filter').addEventListener('change', () => { renderApp(); });
+
+        window.openStudentModal = () => { document.getElementById('student-modal').classList.remove('hidden'); renderStudentList(); }
+        window.closeStudentModal = () => document.getElementById('student-modal').classList.add('hidden');
+        
+        window.renderStudentList = function() {
+            const list = document.getElementById('student-list');
+            list.innerHTML = '';
+            if(window.students.length === 0) {
+                list.innerHTML = '<div class="text-center text-slate-500 py-4 text-xs">등록된 학생이 없습니다.</div>';
+                return;
+            }
+            window.students.forEach(std => {
+                list.innerHTML += `
+                <div class="bg-white p-2.5 rounded border border-slate-200 flex justify-between items-center shadow-sm">
+                    <div>
+                        <div class="font-bold text-sm text-slate-800">${std.name} <span class="text-[10px] font-normal text-slate-500 bg-slate-100 px-1 py-0.5 rounded ml-1">${std.grade}</span></div>
+                        ${std.school ? `<div class="text-[10px] text-slate-500 mt-0.5">${std.school}</div>` : ''}
+                    </div>
+                    <button onclick="deleteStudent('${std.id}')" class="text-slate-400 hover:text-red-500 p-1"><i class="fa-regular fa-trash-can"></i></button>
+                </div>`;
+            });
+        }
+
+        window.handleAddStudent = async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-std-name').value.trim();
+            if(!name) return;
+            const newStd = {
+                id: 'std_' + Date.now(),
+                name: name,
+                grade: document.getElementById('new-std-grade').value.trim() || '미분류',
+                school: document.getElementById('new-std-school').value.trim(),
+                roomCode: window.currentRoomCode
+            };
+            
+            if(isFirebaseActive && firestoreDb && auth.currentUser) {
+                try { await addDoc(studentsRef, newStd); } catch(err) { fallbackToLocalMode(err.message); }
+            } else {
+                window.students.push(newStd);
+                saveData();
+                populateStudentDropdowns();
+                renderStudentList();
+            }
+            document.getElementById('add-student-form').reset();
+            window.showToast("학생이 추가되었습니다.");
+        }
+
+        window.deleteStudent = function(id) {
+            showConfirmModal("이 학생과 연결된 모든 스케줄이 함께 삭제됩니다. 정말 삭제할까요?", async () => {
+                if(isFirebaseActive && firestoreDb && auth.currentUser) {
+                    try {
+                        const targetStd = window.students.find(s => s.id === id);
+                        if(targetStd && targetStd.fbId) await deleteDoc(doc(studentsRef, targetStd.fbId));
+                        const targetSchs = window.schedules.filter(s => s.studentId === id);
+                        for(const sch of targetSchs) {
+                            if(sch.fbId) await deleteDoc(doc(schedulesRef, sch.fbId));
+                        }
+                    } catch(e) { fallbackToLocalMode(e.message); }
+                } else {
+                    window.students = window.students.filter(s => s.id !== id);
+                    window.schedules = window.schedules.filter(s => s.studentId !== id);
+                    saveData();
+                    populateStudentDropdowns();
+                    renderStudentList();
+                    renderApp();
+                }
+                window.showToast("학생이 삭제되었습니다.");
+            }, "학생 삭제");
+        }
+
+        window.openScheduleModal = function(id = null) {
+            if (window.students.length === 0) {
+                window.showToast("먼저 학생 관리를 통해 학생을 등록해주세요.", "warning");
+                openStudentModal();
+                return;
+            }
+            const form = document.getElementById('schedule-form');
+            form.reset();
+            document.getElementById('edit-id').value = '';
+            document.getElementById('btn-delete-schedule').classList.add('hidden');
+            document.getElementById('btn-copy-schedule').classList.add('hidden');
+            document.getElementById('modal-title').innerText = '일정 등록';
+            
+            const sf = document.getElementById('student-filter').value;
+            if(sf !== 'all') document.getElementById('s-student').value = sf;
+            if(currentDayFilter !== 'all') document.getElementById('s-day').value = currentDayFilter;
+
+            if (id) {
+                const sch = window.schedules.find(s => s.id === id);
+                if (sch) {
+                    document.getElementById('modal-title').innerText = '일정 수정';
+                    document.getElementById('edit-id').value = sch.id;
+                    document.getElementById('s-student').value = sch.studentId;
+                    document.getElementById('s-title').value = sch.title;
+                    document.getElementById('s-type').value = sch.type;
+                    document.getElementById('s-day').value = sch.day;
+                    document.getElementById('s-start').value = sch.start;
+                    document.getElementById('s-end').value = sch.end;
+                    document.getElementById('s-memo').value = sch.memo || '';
+                    document.getElementById('s-dday').value = sch.dday || '';
+                    
+                    document.getElementById('btn-delete-schedule').classList.remove('hidden');
+                    document.getElementById('btn-copy-schedule').classList.remove('hidden');
+                }
+            }
+            document.getElementById('schedule-modal').classList.remove('hidden');
+        }
+
+        window.closeScheduleModal = () => document.getElementById('schedule-modal').classList.add('hidden');
+
+        window.copySchedule = function() {
+            document.getElementById('edit-id').value = ''; 
+            document.getElementById('btn-delete-schedule').classList.add('hidden');
+            document.getElementById('btn-copy-schedule').classList.add('hidden');
+            document.getElementById('modal-title').innerText = '일정 등록 (복사됨)';
+            window.showToast("일정이 복제되었습니다. 날짜와 시간을 변경하여 저장해주세요.");
+        }
+
+        window.saveSchedule = async function() {
+            const title = document.getElementById('s-title').value.trim();
+            const start = document.getElementById('s-start').value;
+            const end = document.getElementById('s-end').value;
+            if (!title || !start || !end) {
+                window.showToast("제목, 시작시간, 종료시간을 모두 입력해주세요.", "warning");
+                return;
+            }
+            if (start >= end) {
+                window.showToast("종료 시간이 시작 시간보다 빨라야 합니다.", "warning");
+                return;
+            }
+
+            const id = document.getElementById('edit-id').value;
+            const schData = {
+                studentId: document.getElementById('s-student').value,
+                title: title,
+                type: document.getElementById('s-type').value,
+                day: Number(document.getElementById('s-day').value),
+                start: start,
+                end: end,
+                memo: document.getElementById('s-memo').value.trim(),
+                dday: document.getElementById('s-dday').value,
+                roomCode: window.currentRoomCode
+            };
+
+            if (isFirebaseActive && firestoreDb && auth.currentUser) {
+                try {
+                    if (id) {
+                        const target = window.schedules.find(s => s.id === id);
+                        if(target && target.fbId) await updateDoc(doc(schedulesRef, target.fbId), schData);
+                    } else {
+                        schData.id = 'sch_' + Date.now();
+                        await addDoc(schedulesRef, schData);
+                    }
+                } catch(e) { fallbackToLocalMode(e.message); }
+            } else {
+                if (id) {
+                    const idx = window.schedules.findIndex(s => s.id === id);
+                    if(idx > -1) window.schedules[idx] = { ...schData, id: id };
+                } else {
+                    schData.id = 'sch_' + Date.now();
+                    window.schedules.push(schData);
+                }
+                saveData();
+                renderApp();
+            }
+            closeScheduleModal();
+            window.showToast("일정이 안전하게 저장되었습니다.");
+        }
+
+        window.deleteSchedule = function() {
+            showConfirmModal("정말 이 일정을 삭제할까요?", async () => {
+                const id = document.getElementById('edit-id').value;
+                if (!id) return;
+
+                if (isFirebaseActive && firestoreDb && auth.currentUser) {
+                    try {
+                        const target = window.schedules.find(s => s.id === id);
+                        if(target && target.fbId) await deleteDoc(doc(schedulesRef, target.fbId));
+                    } catch(e) { fallbackToLocalMode(e.message); }
+                } else {
+                    window.schedules = window.schedules.filter(s => s.id !== id);
+                    saveData();
+                    renderApp();
+                }
+                closeScheduleModal();
+                window.showToast("일정이 삭제되었습니다.");
+            }, "일정 삭제");
+        }
+
+        window.openSettingsModal = function() {
+            updateSettingsUI();
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+        window.closeSettingsModal = () => document.getElementById('settings-modal').classList.add('hidden');
+        
+        window.setCheckboxes = function(className, values) {
+            document.querySelectorAll(`.${className}`).forEach(chk => {
+                chk.checked = values.includes(Number(chk.value));
+            });
+        }
+
+        function updateSettingsUI() {
+            document.querySelectorAll('.set-day-chk').forEach(chk => {
+                chk.checked = window.settings.visibleDays.includes(Number(chk.value));
+            });
+            const sStart = document.getElementById('set-time-start');
+            const sEnd = document.getElementById('set-time-end');
+            sStart.innerHTML = ''; sEnd.innerHTML = '';
+            
+            for(let i=6; i<=14; i++) sStart.innerHTML += `<option value="${i}">${i}시 시작</option>`;
+            for(let i=15; i<=24; i++) sEnd.innerHTML += `<option value="${i}">${i === 24 ? '자정' : i+'시'} 종료</option>`;
+            sStart.value = window.settings.startHour;
+            sEnd.value = window.settings.endHour;
+        }
+
+        window.applySettings = function() {
+            const days = [];
+            document.querySelectorAll('.set-day-chk:checked').forEach(chk => days.push(Number(chk.value)));
+            if(days.length === 0) { window.showToast("최소 1개의 요일을 선택해야 합니다.", "warning"); return; }
+            days.sort((a,b) => (a===0?7:a) - (b===0?7:b));
+            
+            window.settings.visibleDays = days;
+            window.settings.startHour = Number(document.getElementById('set-time-start').value);
+            window.settings.endHour = Number(document.getElementById('set-time-end').value);
+            
+            if(currentDayFilter !== 'all' && !days.includes(currentDayFilter)) currentDayFilter = 'all';
+
+            saveSettingsToLocal();
+            closeSettingsModal();
+            window.showToast("설정이 적용되었습니다.");
+        }
+
+        window.openRoomModal = () => document.getElementById('room-modal').classList.remove('hidden');
+        window.closeRoomModal = () => document.getElementById('room-modal').classList.add('hidden');
+        
+        window.copyRoomCode = function() {
+            navigator.clipboard.writeText(window.currentRoomCode).then(() => {
+                window.showToast("코드가 복사되었습니다!");
+            });
+        }
+        
+        window.joinRoom = function() {
+            const val = document.getElementById('join-room-input').value.trim().toUpperCase();
+            if(val.length !== 5) { window.showToast("5자리 코드를 정확히 입력해주세요.", "warning"); return; }
+            if(val === window.currentRoomCode) return closeRoomModal();
+            localStorage.setItem('eduschedule_room_code', val);
+            location.reload(); 
+        }
+
+        window.createNewRoom = function() {
+            showConfirmModal("새로운 텅 빈 스케줄 방을 만드시겠습니까?", () => {
+                const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+                localStorage.setItem('eduschedule_room_code', newCode);
+                localStorage.setItem('is_room_owner_' + newCode, 'true'); 
+                location.reload();
+            }, "새 방 만들기");
+        }
+
+        window.copyDailyAgenda = function() {
+            const list = document.getElementById('daily-agenda-list');
+            if(list.innerText.includes('일정이 없습니다')) {
+                window.showToast("복사할 일정이 없습니다.", "warning"); return;
+            }
+            const today = new Date();
+            let text = `[에듀스케줄 - ${today.getMonth()+1}/${today.getDate()} 일정]\n\n`;
+            const studentFilter = document.getElementById('student-filter').value;
+            let todaysSch = window.schedules.filter(s => Number(s.day) === today.getDay() && (studentFilter === 'all' || s.studentId === studentFilter));
+            todaysSch.sort((a, b) => a.start.localeCompare(b.start));
+            
+            todaysSch.forEach(sch => {
+                const std = getStudentInfo(sch.studentId);
+                text += `• ${std.name}: ${sch.title} (${sch.start}~${sch.end})\n`;
+                if(sch.memo) text += `  └ 메모: ${sch.memo}\n`;
+            });
+            text += `\n*에듀스케줄에서 공유됨`;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                window.showToast("일정 요약이 클립보드에 복사되었습니다!");
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLocalStorage();
+            initFirebase();
+            window.addEventListener('resize', () => { if(!document.getElementById('view-weekly').classList.contains('hidden')) renderGrid(); });
+        });
+    </script>
+</body>
+</html>
