@@ -2,8 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <!-- iOS 사파리 주소창/하단바 숨김 (독립 앱 모드) 및 노치(안전 영역) 대응 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="에듀스케줄">
@@ -34,7 +33,6 @@
             touch-action: manipulation;
         }
         
-        /* 스크롤바 커스텀 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -61,14 +59,14 @@
         .sticky-col-header {
             position: sticky;
             top: 0;
-            z-index: 20;
+            z-index: 50;
             background: #f8fafc;
             border-bottom: 1px solid #e2e8f0;
         }
         .sticky-row-header {
             position: sticky;
             left: 0;
-            z-index: 10;
+            z-index: 50;
             background: #f8fafc;
             border-right: 1px solid #e2e8f0;
         }
@@ -76,10 +74,12 @@
             position: sticky;
             top: 0;
             left: 0;
-            z-index: 30;
-            background: #f8fafc;
-            border-right: 1px solid #e2e8f0;
-            border-bottom: 1px solid #e2e8f0;
+            z-index: 60;
+            background: #e2e8f0 !important;
+            border-right: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            color: #334155;
+            font-weight: 700;
         }
 
         .schedule-block {
@@ -96,9 +96,9 @@
             -webkit-user-select: none;
         }
         .schedule-block:hover {
-            z-index: 25;
-            transform: scale(1.02);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 30;
+            transform: scale(1.03);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         }
 
         .time-tracker-line {
@@ -107,7 +107,7 @@
             right: 0;
             height: 2px;
             background-color: #ef4444;
-            z-index: 15;
+            z-index: 40;
             pointer-events: none;
         }
         .time-tracker-dot {
@@ -122,13 +122,11 @@
     </style>
 </head>
 <body>
-    <!-- 상단 동기화 상태 바 -->
     <div id="sync-status" class="bg-blue-50 text-blue-600 text-[11px] font-medium px-4 py-1.5 flex items-center justify-center gap-2 border-b border-blue-100 hidden">
         <i class="fa-solid fa-cloud-arrow-up animate-pulse"></i> 클라우드 실시간 동기화 연결 중...
     </div>
 
-    <!-- 헤더 영역 -->
-    <header class="bg-slate-900 text-white p-3 sm:p-4 shrink-0 shadow-md flex justify-between items-center z-40">
+    <header class="bg-slate-900 text-white p-3 sm:p-4 shrink-0 shadow-md flex justify-between items-center z-30">
         <div class="flex items-center gap-3">
             <div class="bg-blue-500 w-8 h-8 rounded-lg flex items-center justify-center shadow-inner">
                 <i class="fa-solid fa-graduation-cap text-white text-sm"></i>
@@ -148,68 +146,59 @@
         </div>
     </header>
 
-    <!-- 컨트롤 패널 -->
     <div class="bg-white px-3 sm:px-4 py-3 shrink-0 border-b border-slate-200 shadow-sm z-30">
-        <div class="flex flex-wrap items-center gap-2 sm:gap-3 justify-between">
-            <div class="flex flex-1 min-w-[200px] items-center gap-2">
-                <div class="relative w-full sm:max-w-xs">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i class="fa-solid fa-user text-slate-400 text-xs"></i>
-                    </div>
-                    <select id="student-filter" class="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none">
-                        <option value="all">전체 학생 일정</option>
-                    </select>
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                        <i class="fa-solid fa-chevron-down text-slate-400 text-[10px]"></i>
-                    </div>
-                </div>
+        <!-- 다중 학생 선택 체크박스 및 범례 컬러 변경 영역 -->
+        <div id="student-legend-bar" class="flex flex-wrap items-center gap-2 py-1 text-xs border-b border-slate-100 pb-2">
+            <div class="flex items-center gap-2 mr-2">
+                <span class="text-slate-600 font-bold text-xs flex items-center gap-1">
+                    <i class="fa-solid fa-users text-blue-600"></i> 표시할 학생 선택:
+                </span>
+                <button onclick="toggleAllStudents(true)" class="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded border border-blue-200 transition-colors">전체선택</button>
+                <button onclick="toggleAllStudents(false)" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold px-2 py-0.5 rounded border border-slate-200 transition-colors">전체해제</button>
             </div>
-            
+            <div id="student-legend-list" class="flex flex-wrap items-center gap-1.5"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 mt-2">
+            <div class="flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar pb-0.5 flex-1">
+                <button onclick="switchTab('weekly')" id="tab-weekly" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-blue-600 text-white shadow-sm flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-regular fa-calendar-days"></i> 주간 시간표
+                </button>
+                <button onclick="switchTab('daily')" id="tab-daily" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-list-check"></i> 오늘의 일정
+                </button>
+                <button onclick="switchTab('conflicts')" id="tab-conflicts" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap relative">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> 일정 충돌 검사
+                    <span id="conflict-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full hidden">0</span>
+                </button>
+            </div>
+
             <div class="flex gap-2">
-                <button onclick="openScheduleModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded-md transition-colors font-medium flex items-center gap-1.5 shadow-sm">
+                <button onclick="openScheduleModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-3 py-1.5 rounded-md transition-colors font-medium flex items-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-plus text-xs"></i> 일정 등록
                 </button>
-                <button onclick="injectSampleData(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-md transition-colors border border-slate-200" title="샘플 데이터로 초기화">
-                    <i class="fa-solid fa-rotate-right text-xs"></i>
+                <button onclick="openSettingsModal()" class="px-2 py-1.5 rounded-md text-xs text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1 border border-slate-200">
+                    <i class="fa-solid fa-gear"></i> 설정
                 </button>
             </div>
-        </div>
-        
-        <!-- 탭 네비게이션 -->
-        <div class="flex gap-1 sm:gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
-            <button onclick="switchTab('weekly')" id="tab-weekly" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-blue-600 text-white shadow-sm flex items-center gap-1.5 whitespace-nowrap">
-                <i class="fa-regular fa-calendar-days"></i> 주간 시간표
-            </button>
-            <button onclick="switchTab('daily')" id="tab-daily" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap">
-                <i class="fa-solid fa-list-check"></i> 오늘의 일정
-            </button>
-            <button onclick="switchTab('conflicts')" id="tab-conflicts" class="tab-btn px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 whitespace-nowrap relative">
-                <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> 일정 충돌 검사
-                <span id="conflict-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full hidden">0</span>
-            </button>
-            <button onclick="openSettingsModal()" class="ml-auto px-2 py-1.5 rounded-md text-xs text-slate-500 hover:bg-slate-100 transition-colors flex items-center gap-1 border border-transparent hover:border-slate-200">
-                <i class="fa-solid fa-gear"></i> 설정
-            </button>
         </div>
     </div>
 
-    <!-- 메인 컨텐츠 영역 -->
     <main class="flex-1 flex flex-col p-2 sm:p-4 overflow-hidden relative">
-        
-        <!-- VIEW: 주간 시간표 -->
         <div id="view-weekly" class="flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="px-3 py-2 border-b border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 bg-slate-50/50">
                 <span class="text-xs text-slate-500 font-medium pl-1 shrink-0">보기:</span>
-                <button onclick="setDayFilter('all')" id="day-filter-all" class="day-filter-btn px-2.5 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-bold shrink-0 transition-colors">전체(6일)</button>
+                <button onclick="setDayFilter('all')" id="day-filter-all" class="day-filter-btn px-2.5 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-bold shrink-0 transition-colors">전체(7일)</button>
                 <div id="day-filters-container" class="flex gap-1"></div>
             </div>
             
             <div class="px-3 py-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600 shrink-0 border-b border-slate-100">
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> 학교수업</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> 보습/단과학원</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 개인과외</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> 학원</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 과외</span>
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span> 예체능</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> 자습/독서실</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> 자습/숙제</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-teal-500"></span> 방문학습</span>
             </div>
 
             <div class="scheduler-container" id="scheduler-scroll-area">
@@ -217,7 +206,6 @@
             </div>
         </div>
 
-        <!-- VIEW: 오늘의 일정 -->
         <div id="view-daily" class="hidden flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-4">
             <div class="flex justify-between items-center mb-4 shrink-0">
                 <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -230,7 +218,6 @@
             <div id="daily-agenda-list" class="flex-1 overflow-y-auto space-y-3 pr-2"></div>
         </div>
 
-        <!-- VIEW: 일정 충돌 검사 -->
         <div id="view-conflicts" class="hidden flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-4">
             <div class="mb-4 shrink-0 text-center py-4 bg-slate-50 rounded-lg border border-slate-100">
                 <i class="fa-solid fa-shield-halved text-3xl text-blue-500 mb-2"></i>
@@ -241,8 +228,7 @@
         </div>
     </main>
 
-    <!-- 모달: 학생 관리 -->
-    <div id="student-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div id="student-modal" class="fixed inset-0 bg-black/50 z-[200] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
             <div class="flex justify-between items-center p-4 border-b border-slate-100 shrink-0">
                 <h3 class="text-base font-bold text-slate-800"><i class="fa-solid fa-user-group text-emerald-600 mr-2"></i>학생 관리</h3>
@@ -267,6 +253,13 @@
                             <label class="block text-[10px] font-medium text-slate-500 mb-1">학교/소속 (선택)</label>
                             <input type="text" id="new-std-school" class="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="학교 이름 입력">
                         </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-500 mb-1">범례 색상 지정</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="new-std-color" value="#2563eb" class="w-8 h-8 rounded border border-slate-200 cursor-pointer p-0 bg-transparent">
+                                <span class="text-xs text-slate-500">학생을 구분할 나만의 색상을 선택하세요.</span>
+                            </div>
+                        </div>
                         <button type="submit" class="w-full bg-emerald-600 text-white text-sm py-2 rounded-md font-medium hover:bg-emerald-700 transition-colors shadow-sm">추가하기</button>
                     </form>
                 </div>
@@ -274,15 +267,14 @@
         </div>
     </div>
 
-    <!-- 모달: 스케줄 추가/수정 -->
-    <div id="schedule-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div id="schedule-modal" class="fixed inset-0 bg-black/50 z-[200] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden max-h-[95dvh] flex flex-col">
             <div class="flex justify-between items-center p-3 sm:p-4 border-b border-slate-100 shrink-0 bg-slate-50">
                 <h3 id="modal-title" class="text-base font-bold text-slate-800">일정 등록</h3>
                 <button onclick="closeScheduleModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             
-            <div class="p-3 sm:p-4 overflow-y-auto flex-1 no-scrollbar">
+            <div class="p-4 overflow-y-auto flex-1">
                 <form id="schedule-form" class="space-y-3">
                     <input type="hidden" id="edit-id">
                     <div>
@@ -298,10 +290,11 @@
                             <label class="block text-xs font-semibold text-slate-700 mb-1">일정 유형</label>
                             <select id="s-type" class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="school">학교수업</option>
-                                <option value="academy">보습/단과학원</option>
-                                <option value="tutor">개인과외</option>
+                                <option value="academy">학원</option>
+                                <option value="tutor">과외</option>
                                 <option value="art">예체능</option>
-                                <option value="self">자습/독서실</option>
+                                <option value="self">자습/숙제</option>
+                                <option value="visit">방문학습</option>
                             </select>
                         </div>
                         <div>
@@ -327,6 +320,42 @@
                             <input type="time" id="s-end" required class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
+
+                    <div class="grid grid-cols-2 gap-3 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
+                        <div>
+                            <label class="block text-[11px] font-bold text-blue-900 mb-1"><i class="fa-solid fa-bus text-blue-600 mr-1"></i>차량 탑승 위치</label>
+                            <input type="text" id="s-pickup" class="w-full p-2 bg-white border border-blue-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 아파트 정문 앞">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-blue-900 mb-1"><i class="fa-solid fa-flag-checkered text-emerald-600 mr-1"></i>차량 하차 위치</label>
+                            <input type="text" id="s-dropoff" class="w-full p-2 bg-white border border-blue-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 학원 건물 앞">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 bg-amber-50/50 p-2.5 rounded-lg border border-amber-100">
+                        <div>
+                            <label class="block text-[11px] font-bold text-amber-900 mb-1"><i class="fa-solid fa-bell text-amber-600 mr-1"></i>시작 전 알람 (기기별 개별)</label>
+                            <select id="s-alarm-before" class="w-full p-2 bg-white border border-amber-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                <option value="0">알람 없음</option>
+                                <option value="5">5분 전</option>
+                                <option value="10">10분 전</option>
+                                <option value="15">15분 전</option>
+                                <option value="30">30분 전</option>
+                                <option value="60">1시간 전</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-amber-900 mb-1"><i class="fa-solid fa-bell text-amber-600 mr-1"></i>종료 전 알람 (기기별 개별)</label>
+                            <select id="s-alarm-end-before" class="w-full p-2 bg-white border border-amber-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                <option value="0">알람 없음</option>
+                                <option value="5">5분 전</option>
+                                <option value="10">10분 전</option>
+                                <option value="15">15분 전</option>
+                                <option value="30">30분 전</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">메모 (준비물/과제)</label>
                         <input type="text" id="s-memo" class="w-full p-2 bg-slate-50 border border-slate-200 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="숙제, 교재 등 간략히 입력">
@@ -349,8 +378,7 @@
         </div>
     </div>
 
-    <!-- 모달: 공유 및 방 코드 -->
-    <div id="room-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div id="room-modal" class="fixed inset-0 bg-black/50 z-[200] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div class="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-800 text-white rounded-t-xl">
                 <h3 class="text-base font-bold"><i class="fa-solid fa-share-nodes mr-2 text-blue-300"></i>스케줄 공유하기</h3>
@@ -381,8 +409,7 @@
         </div>
     </div>
 
-    <!-- 모달: 시간표 설정 -->
-    <div id="settings-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div id="settings-modal" class="fixed inset-0 bg-black/50 z-[200] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-sm">
             <div class="flex justify-between items-center p-4 border-b border-slate-100 shrink-0">
                 <h3 class="text-base font-bold text-slate-800"><i class="fa-solid fa-gear text-slate-500 mr-2"></i>시간표 설정</h3>
@@ -416,14 +443,27 @@
                         <select id="set-time-end" class="flex-1 p-2 bg-slate-50 border border-slate-200 text-sm rounded-md"></select>
                     </div>
                 </div>
+
+                <div class="border-t border-slate-100 pt-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">알람 테스트</label>
+                    <button onclick="testAlarmNotification()" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm py-2 rounded-md font-medium transition-colors shadow-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-bell"></i> 알람 미리보기 테스트하기
+                    </button>
+                </div>
+
+                <div class="border-t border-slate-100 pt-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">데이터 관리</label>
+                    <button onclick="injectSampleData(true)" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm py-2 rounded-md font-medium transition-colors border border-slate-200 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rotate-right"></i> 샘플 데이터로 초기화하기
+                    </button>
+                </div>
                 
                 <button onclick="applySettings()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-sm py-2.5 rounded-md font-medium transition-colors shadow-sm">설정 적용하기</button>
             </div>
         </div>
     </div>
 
-    <!-- 커스텀 컨펌 모달 (alert/confirm 대체) -->
-    <div id="confirm-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div id="confirm-modal" class="fixed inset-0 bg-black/50 z-[200] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 text-center">
             <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
                 <i class="fa-solid fa-triangle-exclamation"></i>
@@ -437,13 +477,12 @@
         </div>
     </div>
 
-    <div id="toast-container" class="fixed top-12 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none transition-all"></div>
+    <div id="toast-container" class="fixed top-12 left-1/2 transform -translate-x-1/2 z-[300] flex flex-col gap-2 pointer-events-none transition-all"></div>
 
-    <!-- Firebase SDK & Core Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA5aOOZnCUw0KvlnGBEaavgRTKdiL4y7KI",
@@ -462,21 +501,132 @@
         
         window.students = [];
         window.schedules = [];
-        window.currentRoomCode = localStorage.getItem('eduschedule_room_code');
+        window.selectedStudentIds = new Set();
+        window.hasInitializedSelections = false;
         
-        if (!window.currentRoomCode) {
-            window.currentRoomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-            localStorage.setItem('eduschedule_room_code', window.currentRoomCode);
-            localStorage.setItem('is_room_owner_' + window.currentRoomCode, 'true');
-        }
+        // FIXED Room Code to guarantee data persistence across reloads/updates
+        window.currentRoomCode = localStorage.getItem('eduschedule_room_code') || 'ROOM_001';
+        localStorage.setItem('eduschedule_room_code', window.currentRoomCode);
+
+        // Preset palette options
+        const studentPalettes = [
+            { badgeBg: '#2563eb', border: '#1d4ed8', lightBg: '#eff6ff', text: '#1e40af', name: '블루' },
+            { badgeBg: '#e11d48', border: '#be123c', lightBg: '#fff1f2', text: '#9f1239', name: '로즈' },
+            { badgeBg: '#059669', border: '#047857', lightBg: '#ecfdf5', text: '#065f46', name: '에메랄드' },
+            { badgeBg: '#d97706', border: '#b45309', lightBg: '#fffbeb', text: '#92400e', name: '앰버' },
+            { badgeBg: '#7c3aed', border: '#6d28d9', lightBg: '#f5f3ff', text: '#5b21b6', name: '바이올렛' },
+            { badgeBg: '#0891b2', border: '#0e7490', lightBg: '#ecfeff', text: '#155e75', name: '시안' }
+        ];
+
+        window.getStudentColor = function(studentId) {
+            const std = window.students.find(s => s.id === studentId);
+            const idx = window.students.findIndex(s => s.id === studentId);
+            const defaultPal = studentPalettes[(idx >= 0 ? idx : 0) % studentPalettes.length];
+
+            if (std && std.color) {
+                return {
+                    badgeBg: std.color,
+                    border: std.color,
+                    lightBg: std.color + '18',
+                    text: '#ffffff',
+                    name: '커스텀'
+                };
+            }
+            return defaultPal;
+        };
+
+        window.updateStudentColor = async function(studentId, newColor) {
+            const std = window.students.find(s => s.id === studentId);
+            if (!std) return;
+            std.color = newColor;
+            saveData();
+            renderApp();
+
+            if (isFirebaseActive && firestoreDb && auth.currentUser && std.fbId) {
+                try {
+                    await updateDoc(doc(studentsRef, std.fbId), { color: newColor });
+                } catch(e) { console.warn(e); }
+            }
+            window.showToast(`${std.name} 학생의 색상이 변경되었습니다.`);
+        };
         
-        window.settings = {
-            visibleDays: [1, 2, 3, 4, 5, 6, 0],
+        // Load persistent settings safely from localStorage
+        let savedSettings = null;
+        try {
+            savedSettings = JSON.parse(localStorage.getItem('eduschedule_settings'));
+        } catch(e) {}
+
+        window.settings = savedSettings || {
+            visibleDays: [1, 2, 3, 4, 5, 6, 0], // Include ALL 7 days by default so schedules on Sunday are never hidden!
             startHour: 8,
             endHour: 22
         };
+
         const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
         let currentDayFilter = 'all'; 
+
+        function getDeletedIds() {
+            try {
+                return new Set(JSON.parse(localStorage.getItem('eduschedule_deleted_ids_' + window.currentRoomCode) || '[]'));
+            } catch(e) {
+                return new Set();
+            }
+        }
+
+        function markDeletedId(id) {
+            const set = getDeletedIds();
+            set.add(id);
+            localStorage.setItem('eduschedule_deleted_ids_' + window.currentRoomCode, JSON.stringify(Array.from(set)));
+        }
+
+        window.copyToClipboard = function(text, successMsg = "클립보드에 복사되었습니다!") {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    window.showToast(successMsg);
+                } else {
+                    window.showToast("복사에 실패했습니다.", "error");
+                }
+            } catch (err) {
+                window.showToast("복사 권한이 차단되었습니다.", "error");
+            }
+            document.body.removeChild(textarea);
+        };
+
+        window.getLocalAlarm = function(schId) {
+            const saved = localStorage.getItem('eduschedule_alarm_' + schId);
+            if (saved) {
+                try { return JSON.parse(saved); } catch(e) {}
+            }
+            return { alarmBefore: 10, alarmEndBefore: 0 };
+        };
+
+        window.saveLocalAlarm = function(schId, alarmBefore, alarmEndBefore) {
+            localStorage.setItem('eduschedule_alarm_' + schId, JSON.stringify({ alarmBefore: Number(alarmBefore), alarmEndBefore: Number(alarmEndBefore) }));
+        };
+
+        window.testAlarmNotification = function() {
+            const msg = "[알람 테스트] 김지훈 학생의 '청솔 수학학원' 일정이 10분 전입니다!";
+            window.showToast(msg, 'warning');
+            if ("Notification" in window) {
+                if (Notification.permission === "granted") {
+                    new Notification("에듀스케줄 알람 테스트", { body: msg });
+                } else if (Notification.permission !== "denied") {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === "granted") {
+                            new Notification("에듀스케줄 알람 테스트", { body: msg });
+                        }
+                    });
+                }
+            }
+        };
 
         window.getFutureDateStr = function(daysToAdd) {
             const date = new Date();
@@ -528,11 +678,12 @@
             syncBar.classList.remove('hidden');
             
             loadLocalStorage();
-            if (window.students.length === 0) window.injectSampleData(false);
             renderApp();
         }
 
         async function initFirebase() {
+            loadLocalStorage();
+
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
@@ -549,16 +700,14 @@
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'edu-schedule-app';
                 schedulesRef = collection(firestoreDb, 'artifacts', appId, 'public', 'data', 'schedules');
                 studentsRef = collection(firestoreDb, 'artifacts', appId, 'public', 'data', 'students');
-                
-                // 데이터 선조치(샘플 자동 생성 체크)
-                await seedSampleDataToCloudIfNeeded();
 
                 onSnapshot(studentsRef, (snapshot) => {
                     const loaded = [];
                     snapshot.forEach(d => {
                         if (d.data().roomCode === window.currentRoomCode) loaded.push({ fbId: d.id, ...d.data() });
                     });
-                    window.students = loaded;
+                    mergeStudents(loaded);
+                    syncStudentSelections();
                     populateStudentDropdowns();
                     if (!document.getElementById('student-modal').classList.contains('hidden')) window.renderStudentList();
                     renderApp();
@@ -571,7 +720,7 @@
                     snapshot.forEach(d => {
                         if (d.data().roomCode === window.currentRoomCode) loaded.push({ fbId: d.id, ...d.data() });
                     });
-                    window.schedules = loaded;
+                    mergeSchedules(loaded);
                     renderApp();
                 }, (e) => {
                     console.warn("Schedules snapshot warning:", e.message);
@@ -583,54 +732,162 @@
             }
         }
 
-        async function seedSampleDataToCloudIfNeeded() {
-            try {
-                const studentSnap = await getDocs(studentsRef);
-                let roomHasStudents = false;
-                studentSnap.forEach(d => {
-                    if (d.data().roomCode === window.currentRoomCode) roomHasStudents = true;
-                });
+        function mergeStudents(cloudStudents) {
+            const deletedSet = getDeletedIds();
+            const mergedMap = new Map();
 
-                if (!roomHasStudents) {
-                    const defaultStudents = [
-                        { id: 'std_1', name: '김지훈', grade: '중2', school: '대한중학교', roomCode: window.currentRoomCode },
-                        { id: 'std_2', name: '이서아', grade: '고1', school: '민국고등학교', roomCode: window.currentRoomCode }
-                    ];
-                    const defaultSchedules = [
-                        { id: 'sch_1', studentId: 'std_1', title: '학교수업', type: 'school', day: 1, start: '08:30', end: '15:20', memo: '6교시', roomCode: window.currentRoomCode },
-                        { id: 'sch_2', studentId: 'std_1', title: '청솔 수학학원', type: 'academy', day: 1, start: '16:00', end: '18:00', memo: '숙제: 3단원 풀기', roomCode: window.currentRoomCode, dday: window.getFutureDateStr(2) },
-                        { id: 'sch_3', studentId: 'std_1', title: '영어 과외', type: 'tutor', day: 3, start: '19:00', end: '21:00', memo: '단어시험 준비', roomCode: window.currentRoomCode },
-                        { id: 'sch_4', studentId: 'std_2', title: '학교수업', type: 'school', day: 2, start: '08:00', end: '16:30', memo: '7교시', roomCode: window.currentRoomCode },
-                        { id: 'sch_5', studentId: 'std_2', title: '대성 국어학원', type: 'academy', day: 2, start: '18:00', end: '20:00', memo: '', roomCode: window.currentRoomCode },
-                    ];
-
-                    for(const st of defaultStudents) await addDoc(studentsRef, st);
-                    for(const sc of defaultSchedules) await addDoc(schedulesRef, sc);
+            window.students.forEach(st => {
+                if (st && st.id && !deletedSet.has(st.id)) {
+                    mergedMap.set(st.id, st);
                 }
-            } catch(err) {
-                console.warn("Seed error:", err);
+            });
+
+            cloudStudents.forEach(cloudStd => {
+                if (!cloudStd || !cloudStd.id || deletedSet.has(cloudStd.id)) {
+                    if (cloudStd && cloudStd.fbId && isFirebaseActive && firestoreDb && auth.currentUser) {
+                        deleteDoc(doc(studentsRef, cloudStd.fbId)).catch(() => {});
+                    }
+                    return;
+                }
+                const localStd = mergedMap.get(cloudStd.id);
+                if (localStd) {
+                    mergedMap.set(cloudStd.id, { ...localStd, ...cloudStd, fbId: cloudStd.fbId });
+                } else {
+                    mergedMap.set(cloudStd.id, cloudStd);
+                }
+            });
+
+            window.students = Array.from(mergedMap.values());
+            saveData();
+
+            if (isFirebaseActive && firestoreDb && auth.currentUser) {
+                window.students.forEach(async (s) => {
+                    if (!s.fbId && !deletedSet.has(s.id)) {
+                        try {
+                            const docRef = await addDoc(studentsRef, s);
+                            s.fbId = docRef.id;
+                        } catch(e) {}
+                    }
+                });
             }
+        }
+
+        function mergeSchedules(cloudSchedules) {
+            const deletedSet = getDeletedIds();
+            const mergedMap = new Map();
+
+            window.schedules.forEach(s => {
+                if (s && s.id && !deletedSet.has(s.id)) {
+                    mergedMap.set(s.id, s);
+                }
+            });
+
+            cloudSchedules.forEach(cloudSch => {
+                if (!cloudSch || !cloudSch.id || deletedSet.has(cloudSch.id)) {
+                    if (cloudSch && cloudSch.fbId && isFirebaseActive && firestoreDb && auth.currentUser) {
+                        deleteDoc(doc(schedulesRef, cloudSch.fbId)).catch(() => {});
+                    }
+                    return;
+                }
+                const localSch = mergedMap.get(cloudSch.id);
+                if (localSch) {
+                    mergedMap.set(cloudSch.id, { ...localSch, ...cloudSch, fbId: cloudSch.fbId });
+                } else {
+                    mergedMap.set(cloudSch.id, cloudSch);
+                }
+            });
+
+            window.schedules = Array.from(mergedMap.values());
+            saveData();
+
+            if (isFirebaseActive && firestoreDb && auth.currentUser) {
+                window.schedules.forEach(async (sch) => {
+                    if (!sch.fbId && !deletedSet.has(sch.id)) {
+                        try {
+                            const docRef = await addDoc(schedulesRef, sch);
+                            sch.fbId = docRef.id;
+                        } catch(e) {}
+                    }
+                });
+            }
+        }
+
+        function syncStudentSelections() {
+            if (!window.selectedStudentIds) {
+                window.selectedStudentIds = new Set();
+            }
+            if (!window.hasInitializedSelections || window.selectedStudentIds.size === 0) {
+                window.selectedStudentIds = new Set(window.students.map(s => s.id));
+                window.hasInitializedSelections = true;
+            } else {
+                // Ensure new students are automatically checked by default
+                window.students.forEach(s => {
+                    if (!window.knownStudentIds || !window.knownStudentIds.has(s.id)) {
+                        window.selectedStudentIds.add(s.id);
+                    }
+                });
+            }
+            window.knownStudentIds = new Set(window.students.map(s => s.id));
         }
 
         function loadLocalStorage() {
             const savedSettings = localStorage.getItem('eduschedule_settings');
-            if (savedSettings) window.settings = JSON.parse(savedSettings);
+            if (savedSettings) {
+                try { window.settings = JSON.parse(savedSettings); } catch(e) {}
+            }
             
-            if (!isFirebaseActive) {
-                const savedStudents = localStorage.getItem('eduschedule_students_' + window.currentRoomCode);
-                const savedSchedules = localStorage.getItem('eduschedule_schedules_' + window.currentRoomCode);
-                if (savedStudents) window.students = JSON.parse(savedStudents);
-                if (savedSchedules) window.schedules = JSON.parse(savedSchedules);
+            let savedStudents = localStorage.getItem('eduschedule_students_' + window.currentRoomCode) || localStorage.getItem('eduschedule_students_backup');
+            let savedSchedules = localStorage.getItem('eduschedule_schedules_' + window.currentRoomCode) || localStorage.getItem('eduschedule_schedules_backup');
+            
+            // Search all other room keys in localStorage if current room has no data
+            if (!savedStudents || JSON.parse(savedStudents).length === 0) {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('eduschedule_students_') && !key.endsWith('_backup')) {
+                        const val = localStorage.getItem(key);
+                        if (val && JSON.parse(val).length > 0) { savedStudents = val; break; }
+                    }
+                }
+            }
+            if (!savedSchedules || JSON.parse(savedSchedules).length === 0) {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('eduschedule_schedules_') && !key.endsWith('_backup')) {
+                        const val = localStorage.getItem(key);
+                        if (val && JSON.parse(val).length > 0) { savedSchedules = val; break; }
+                    }
+                }
+            }
+
+            if (savedStudents) {
+                try { window.students = JSON.parse(savedStudents); } catch(e) {}
+            }
+            if (savedSchedules) {
+                try { window.schedules = JSON.parse(savedSchedules); } catch(e) {}
+            }
+            
+            const deletedSet = getDeletedIds();
+            window.students = window.students.filter(s => s && s.id && !deletedSet.has(s.id));
+            window.schedules = window.schedules.filter(s => s && s.id && !deletedSet.has(s.id));
+
+            syncStudentSelections();
+
+            const isInitialized = localStorage.getItem('eduschedule_initialized_' + window.currentRoomCode);
+            if (!isInitialized && window.students.length === 0 && window.schedules.length === 0) {
+                injectSampleData(false);
+                localStorage.setItem('eduschedule_initialized_' + window.currentRoomCode, 'true');
+            } else {
                 populateStudentDropdowns();
             }
             updateSettingsUI();
         }
 
         window.saveData = function() {
-            if (!isFirebaseActive) {
-                localStorage.setItem('eduschedule_students_' + window.currentRoomCode, JSON.stringify(window.students));
-                localStorage.setItem('eduschedule_schedules_' + window.currentRoomCode, JSON.stringify(window.schedules));
-            }
+            localStorage.setItem('eduschedule_students_' + window.currentRoomCode, JSON.stringify(window.students));
+            localStorage.setItem('eduschedule_schedules_' + window.currentRoomCode, JSON.stringify(window.schedules));
+            // Backup keys
+            localStorage.setItem('eduschedule_students_backup', JSON.stringify(window.students));
+            localStorage.setItem('eduschedule_schedules_backup', JSON.stringify(window.schedules));
         }
 
         function saveSettingsToLocal() {
@@ -642,35 +899,40 @@
         window.injectSampleData = async function(isManualReset = false) {
             const runReset = async () => {
                 const defaultStudents = [
-                    { id: 'std_1', name: '김지훈', grade: '중2', school: '대한중학교', roomCode: window.currentRoomCode },
-                    { id: 'std_2', name: '이서아', grade: '고1', school: '민국고등학교', roomCode: window.currentRoomCode }
+                    { id: 'std_1', name: '김지훈', grade: '중2', school: '대한중학교', color: '#2563eb', roomCode: window.currentRoomCode },
+                    { id: 'std_2', name: '이서아', grade: '고1', school: '민국고등학교', color: '#e11d48', roomCode: window.currentRoomCode },
+                    { id: 'std_3', name: '강지유', grade: '초4', school: '신정초등학교', color: '#059669', roomCode: window.currentRoomCode },
+                    { id: 'std_4', name: '강지안', grade: '초2', school: '신정초등학교', color: '#d97706', roomCode: window.currentRoomCode }
                 ];
                 const defaultSchedules = [
                     { id: 'sch_1', studentId: 'std_1', title: '학교수업', type: 'school', day: 1, start: '08:30', end: '15:20', memo: '6교시', roomCode: window.currentRoomCode },
-                    { id: 'sch_2', studentId: 'std_1', title: '청솔 수학학원', type: 'academy', day: 1, start: '16:00', end: '18:00', memo: '숙제: 3단원 풀기', roomCode: window.currentRoomCode, dday: window.getFutureDateStr(2) },
+                    { id: 'sch_2', studentId: 'std_1', title: '청솔 수학학원', type: 'academy', day: 1, start: '16:00', end: '18:00', memo: '숙제: 3단원 풀기', pickupLocation: '아파트 정문', dropoffLocation: '학원 건물 앞', roomCode: window.currentRoomCode, dday: window.getFutureDateStr(2) },
                     { id: 'sch_3', studentId: 'std_1', title: '영어 과외', type: 'tutor', day: 3, start: '19:00', end: '21:00', memo: '단어시험 준비', roomCode: window.currentRoomCode },
                     { id: 'sch_4', studentId: 'std_2', title: '학교수업', type: 'school', day: 2, start: '08:00', end: '16:30', memo: '7교시', roomCode: window.currentRoomCode },
                     { id: 'sch_5', studentId: 'std_2', title: '대성 국어학원', type: 'academy', day: 2, start: '18:00', end: '20:00', memo: '', roomCode: window.currentRoomCode },
                 ];
 
-                if (isFirebaseActive && firestoreDb && auth.currentUser) {
+                localStorage.removeItem('eduschedule_deleted_ids_' + window.currentRoomCode);
+                window.students = defaultStudents;
+                window.schedules = defaultSchedules;
+                window.selectedStudentIds = new Set(defaultStudents.map(s => s.id));
+                defaultSchedules.forEach(s => window.saveLocalAlarm(s.id, 10, 0));
+                localStorage.setItem('eduschedule_initialized_' + window.currentRoomCode, 'true');
+                saveData();
+                populateStudentDropdowns();
+                renderApp();
+
+                if (isFirebaseActive && firestoreDb && auth.currentUser && isManualReset) {
                     try {
                         for(const s of window.schedules) if(s.fbId) await deleteDoc(doc(schedulesRef, s.fbId));
                         for(const st of window.students) if(st.fbId) await deleteDoc(doc(studentsRef, st.fbId));
                         for(const s of defaultStudents) await addDoc(studentsRef, s);
                         for(const s of defaultSchedules) await addDoc(schedulesRef, s);
-                        window.showToast("샘플 데이터가 적용되었습니다.");
                     } catch(err) {
-                        fallbackToLocalMode(err.message);
+                        console.warn("Cloud reset sync warning:", err);
                     }
-                } else {
-                    window.students = defaultStudents;
-                    window.schedules = defaultSchedules;
-                    saveData();
-                    populateStudentDropdowns();
-                    renderApp();
-                    window.showToast("샘플 데이터가 적용되었습니다.");
                 }
+                if(isManualReset) window.showToast("샘플 데이터로 초기화되었습니다.");
             };
 
             if (isManualReset) {
@@ -700,17 +962,67 @@
             'academy': 'bg-purple-100 border-purple-300 text-purple-800',
             'tutor': 'bg-emerald-100 border-emerald-300 text-emerald-800',
             'art': 'bg-pink-100 border-pink-300 text-pink-800',
-            'self': 'bg-amber-100 border-amber-300 text-amber-800'
+            'self': 'bg-amber-100 border-amber-300 text-amber-800',
+            'visit': 'bg-teal-100 border-teal-300 text-teal-800'
         };
 
         function getStudentInfo(id) {
             return window.students.find(s => s.id === id) || { name: '알수없음' };
         }
 
+        window.toggleStudentSelection = function(stdId) {
+            if (!window.selectedStudentIds) window.selectedStudentIds = new Set();
+            if (window.selectedStudentIds.has(stdId)) {
+                window.selectedStudentIds.delete(stdId);
+            } else {
+                window.selectedStudentIds.add(stdId);
+            }
+            renderApp();
+        };
+
+        window.toggleAllStudents = function(selectAll) {
+            if (selectAll) {
+                window.selectedStudentIds = new Set(window.students.map(s => s.id));
+            } else {
+                window.selectedStudentIds.clear();
+            }
+            renderApp();
+        };
+
+        function renderStudentLegend() {
+            const legendList = document.getElementById('student-legend-list');
+            if (!legendList) return;
+            legendList.innerHTML = '';
+
+            if (window.students.length === 0) {
+                legendList.innerHTML = '<span class="text-slate-400 text-[11px]">등록된 학생이 없습니다.</span>';
+                return;
+            }
+
+            window.students.forEach(std => {
+                const stdColor = window.getStudentColor(std.id);
+                const isChecked = window.selectedStudentIds.has(std.id);
+
+                const label = document.createElement('label');
+                label.className = `inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border transition-all cursor-pointer shadow-2xs select-none ${isChecked ? 'bg-white border-slate-300 text-slate-800 font-bold' : 'bg-slate-100 border-slate-200 text-slate-400 font-normal opacity-60'}`;
+
+                label.innerHTML = `
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="window.toggleStudentSelection('${std.id}')" class="accent-blue-600 rounded w-3.5 h-3.5 cursor-pointer">
+                    <div class="relative flex items-center justify-center group" title="클릭하여 범례 색상 변경">
+                        <span class="w-3.5 h-3.5 rounded-full inline-block border border-black/10 shrink-0" style="background-color: ${stdColor.badgeBg}"></span>
+                        <input type="color" value="${stdColor.badgeBg}" onchange="window.updateStudentColor('${std.id}', this.value)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                    </div>
+                    <span>${std.name} (${std.grade})</span>
+                `;
+                legendList.appendChild(label);
+            });
+        }
+
         window.renderApp = function() {
             document.getElementById('header-room-code').innerText = window.currentRoomCode;
             document.getElementById('display-room-code').innerText = window.currentRoomCode;
             
+            renderStudentLegend();
             checkConflicts();
             renderDayFilters();
             renderGrid();
@@ -731,11 +1043,21 @@
                 allBtn.className = "day-filter-btn px-2.5 py-1 text-xs rounded-full bg-slate-100 text-slate-600 font-medium shrink-0 hover:bg-slate-200";
             }
 
+            const today = new Date().getDay();
             window.settings.visibleDays.forEach(dayIndex => {
                 const btn = document.createElement('button');
                 const isSelected = currentDayFilter === dayIndex;
-                btn.className = `day-filter-btn px-2.5 py-1 text-xs rounded-full shrink-0 transition-colors ${isSelected ? 'bg-blue-500 text-white font-bold shadow-sm' : 'bg-slate-100 text-slate-600 font-medium hover:bg-slate-200'}`;
-                btn.innerText = dayNames[dayIndex];
+                const isToday = dayIndex === today;
+                
+                let baseClass = "day-filter-btn px-2.5 py-1 text-xs rounded-full shrink-0 transition-colors flex items-center gap-1";
+                if (isSelected) {
+                    btn.className = `${baseClass} bg-blue-500 text-white font-bold shadow-sm`;
+                } else if (isToday) {
+                    btn.className = `${baseClass} bg-blue-50 text-blue-700 font-bold border border-blue-300 shadow-sm`;
+                } else {
+                    btn.className = `${baseClass} bg-slate-100 text-slate-600 font-medium hover:bg-slate-200`;
+                }
+                btn.innerHTML = `${dayNames[dayIndex]} ${isToday && !isSelected ? '<span class="w-1.5 h-1.5 bg-blue-500 rounded-full inline-block"></span>' : ''}`;
                 btn.onclick = () => setDayFilter(dayIndex);
                 container.appendChild(btn);
             });
@@ -770,7 +1092,6 @@
 
         function renderGrid() {
             const gridDiv = document.getElementById('scheduler-grid');
-            const studentFilter = document.getElementById('student-filter').value;
             
             const startH = window.settings.startHour;
             const endH = window.settings.endHour;
@@ -789,7 +1110,7 @@
             const today = new Date().getDay();
 
             const corner = document.createElement('div');
-            corner.className = 'sticky-corner flex items-center justify-center text-xs font-semibold text-slate-400 bg-slate-50';
+            corner.className = 'sticky-corner flex items-center justify-center text-xs shadow-sm';
             corner.innerText = '시간';
             gridDiv.appendChild(corner);
 
@@ -819,10 +1140,71 @@
                 });
             }
 
+            // Filter schedules based on checkbox selections
             const filteredSchedules = window.schedules.filter(s => {
-                const matchStudent = studentFilter === 'all' || s.studentId === studentFilter;
+                const matchStudent = window.selectedStudentIds ? window.selectedStudentIds.has(s.studentId) : true;
                 const matchDay = displayDays.includes(Number(s.day));
                 return matchStudent && matchDay;
+            });
+
+            // COMPUTE OVERLAPS PER DAY (Side-by-side split layout)
+            const scheduleLayouts = {}; 
+            displayDays.forEach(day => {
+                const daySchs = filteredSchedules.filter(s => Number(s.day) === day);
+                if (daySchs.length === 0) return;
+
+                daySchs.sort((a, b) => {
+                    const diff = timeToMins(a.start) - timeToMins(b.start);
+                    if (diff !== 0) return diff;
+                    return (timeToMins(b.end) - timeToMins(b.start)) - (timeToMins(a.end) - timeToMins(a.start));
+                });
+
+                const columns = [];
+                daySchs.forEach(sch => {
+                    const sMins = timeToMins(sch.start);
+                    const eMins = timeToMins(sch.end);
+                    let placedCol = -1;
+                    for (let c = 0; c < columns.length; c++) {
+                        if (columns[c] <= sMins) {
+                            placedCol = c;
+                            columns[c] = eMins;
+                            break;
+                        }
+                    }
+                    if (placedCol === -1) {
+                        placedCol = columns.length;
+                        columns.push(eMins);
+                    }
+                    scheduleLayouts[sch.id] = { col: placedCol, total: 1 };
+                });
+
+                daySchs.forEach(sch1 => {
+                    const s1 = timeToMins(sch1.start);
+                    const e1 = timeToMins(sch1.end);
+                    let maxColUsed = scheduleLayouts[sch1.id].col;
+                    daySchs.forEach(sch2 => {
+                        const s2 = timeToMins(sch2.start);
+                        const e2 = timeToMins(sch2.end);
+                        if (Math.max(s1, s2) < Math.min(e1, e2)) {
+                            maxColUsed = Math.max(maxColUsed, scheduleLayouts[sch2.id].col);
+                        }
+                    });
+                    scheduleLayouts[sch1.id].total = maxColUsed + 1;
+                });
+
+                daySchs.forEach(sch1 => {
+                    const s1 = timeToMins(sch1.start);
+                    const e1 = timeToMins(sch1.end);
+                    let groupMax = scheduleLayouts[sch1.id].total;
+                    daySchs.forEach(sch2 => {
+                        const s2 = timeToMins(sch2.start);
+                        const e2 = timeToMins(sch2.end);
+                        if (Math.max(s1, s2) < Math.min(e1, e2)) {
+                            groupMax = Math.max(groupMax, scheduleLayouts[sch2.id].total);
+                        }
+                    });
+                    scheduleLayouts[sch1.id].total = groupMax;
+                });
             });
 
             filteredSchedules.forEach(sch => {
@@ -839,24 +1221,46 @@
                 let drawEh = eh >= endH ? endH : eh;
                 let drawEm = eh >= endH ? 0 : em;
 
-                const topPx = 40 + (drawSh - startH) * cellHeight + (drawSm / 60) * cellHeight;
-                const heightPx = ((drawEh - drawSh) * 60 + (drawEm - drawSm)) * (cellHeight / 60);
+                const calculatedTopPx = 40 + (drawSh - startH) * cellHeight + (drawSm / 60) * cellHeight;
+                const topPx = Math.max(40, calculatedTopPx);
+                
+                const calculatedBottomPx = 40 + (drawEh - startH) * cellHeight + (drawEm / 60) * cellHeight;
+                const bottomPx = Math.max(topPx + 20, calculatedBottomPx);
+                const heightPx = bottomPx - topPx;
 
-                const leftPercent = (timeColWidth / gridDiv.offsetWidth) * 100;
-                const widthPerDay = (100 - leftPercent) / colCount;
-                const blockLeft = leftPercent + (widthPerDay * dayIndex);
+                const layout = scheduleLayouts[sch.id] || { col: 0, total: 1 };
+                
+                const subWidthCalc = `(100% - 55px) / (${colCount} * ${layout.total})`;
+                const subLeftCalc = `55px + (100% - 55px) * (${dayIndex} / ${colCount} + ${layout.col} / (${colCount} * ${layout.total}))`;
+
+                const stdColor = window.getStudentColor(sch.studentId);
 
                 const block = document.createElement('div');
                 block.className = `schedule-block border flex flex-col justify-between ${typeColors[sch.type] || typeColors['school']}`;
                 block.style.top = `${topPx + 1}px`;
                 block.style.height = `${heightPx - 2}px`;
-                block.style.left = `calc(${blockLeft}% + 2px)`;
-                block.style.width = `calc(${widthPerDay}% - 4px)`;
+                block.style.left = `calc(${subLeftCalc} + 2px)`;
+                block.style.width = `calc(${subWidthCalc} - 4px)`;
+                block.style.borderLeft = `4px solid ${stdColor.badgeBg}`;
 
                 const studentInfo = getStudentInfo(sch.studentId);
-                let html = `<div class="font-bold truncate leading-tight pointer-events-none">${sch.title}</div>`;
+                const localAlarm = window.getLocalAlarm(sch.id);
+                let html = `<div class="font-bold text-xs truncate leading-tight pointer-events-none">${sch.title}</div>`;
                 if (heightPx > 40) {
-                    html += `<div class="text-[10px] opacity-80 mt-0.5 truncate pointer-events-none"><i class="fa-solid fa-user text-[8px] mr-0.5"></i>${studentInfo.name}</div>`;
+                    html += `<div class="mt-0.5 truncate pointer-events-none">
+                        <span class="inline-block px-1.5 py-0.2 text-[9px] font-extrabold text-white rounded-full shadow-xs" style="background-color: ${stdColor.badgeBg};">
+                            ${studentInfo.name}
+                        </span>
+                    </div>`;
+                    if(sch.pickupLocation && heightPx > 58) {
+                        html += `<div class="text-[9px] opacity-75 truncate pointer-events-none mt-0.5"><i class="fa-solid fa-bus text-[8px] mr-0.5"></i>탑승: ${sch.pickupLocation}</div>`;
+                    }
+                    if(sch.dropoffLocation && heightPx > 72) {
+                        html += `<div class="text-[9px] opacity-75 truncate pointer-events-none"><i class="fa-solid fa-flag-checkered text-[8px] mr-0.5"></i>하차: ${sch.dropoffLocation}</div>`;
+                    }
+                    if(((localAlarm.alarmBefore > 0) || (localAlarm.alarmEndBefore > 0)) && heightPx > 86) {
+                        html += `<div class="text-[9px] text-amber-700 truncate pointer-events-none"><i class="fa-solid fa-bell text-[8px] mr-0.5"></i>알람</div>`;
+                    }
                     html += `<div class="text-[9px] opacity-75 mt-auto text-right truncate pointer-events-none">${sch.start} - ${sch.end}</div>`;
                 }
                 block.innerHTML = html;
@@ -891,7 +1295,7 @@
                     const dropX = blockRect.left + (blockRect.width / 2) - gridRect.left;
                     const dropY = blockRect.top - gridRect.top;
                     
-                    if (dropX > timeColWidth && dropX < gridRect.width && dropY > 0 && dropY < gridRect.height) {
+                    if (dropX > timeColWidth && dropX < gridRect.width && dropY > 40 && dropY < gridRect.height) {
                         const colW = (gridRect.width - timeColWidth) / displayDays.length;
                         const targetCol = Math.floor((dropX - timeColWidth) / colW);
                         const newDay = displayDays[targetCol];
@@ -983,17 +1387,67 @@
             trackerInterval = setInterval(drawTracker, 60000); 
         }
 
+        let alarmCheckerInterval = null;
+        const triggeredAlarms = new Set();
+
+        function initAlarmChecker() {
+            if (alarmCheckerInterval) clearInterval(alarmCheckerInterval);
+            if ("Notification" in window && Notification.permission !== "granted") {
+                Notification.requestPermission().catch(() => {});
+            }
+
+            alarmCheckerInterval = setInterval(() => {
+                const now = new Date();
+                const currentDay = now.getDay();
+                const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+                const dateStr = now.toISOString().split('T')[0];
+
+                window.schedules.forEach(sch => {
+                    if (Number(sch.day) !== currentDay) return;
+                    const startMins = window.timeToMins(sch.start);
+                    const endMins = window.timeToMins(sch.end);
+                    const std = getStudentInfo(sch.studentId);
+                    const localAlarm = window.getLocalAlarm(sch.id);
+
+                    if (localAlarm.alarmBefore && Number(localAlarm.alarmBefore) > 0) {
+                        const alarmTargetMins = startMins - Number(localAlarm.alarmBefore);
+                        const alarmKey = `${dateStr}-${sch.id}-before-${alarmTargetMins}`;
+                        if (currentTotalMins === alarmTargetMins && !triggeredAlarms.has(alarmKey)) {
+                            triggeredAlarms.add(alarmKey);
+                            const msg = `[알람] ${std.name} 학생의 '${sch.title}' 일정(${sch.start})이 ${localAlarm.alarmBefore}분 전입니다!`;
+                            window.showToast(msg, 'warning');
+                            if ("Notification" in window && Notification.permission === "granted") {
+                                new Notification("에듀스케줄 알람", { body: msg });
+                            }
+                        }
+                    }
+
+                    if (localAlarm.alarmEndBefore && Number(localAlarm.alarmEndBefore) > 0) {
+                        const alarmTargetMins = endMins - Number(localAlarm.alarmEndBefore);
+                        const alarmKey = `${dateStr}-${sch.id}-endbefore-${alarmTargetMins}`;
+                        if (currentTotalMins === alarmTargetMins && !triggeredAlarms.has(alarmKey)) {
+                            triggeredAlarms.add(alarmKey);
+                            const msg = `[알람] ${std.name} 학생의 '${sch.title}' 일정 종료(${sch.end})가 ${localAlarm.alarmEndBefore}분 전입니다!`;
+                            window.showToast(msg, 'warning');
+                            if ("Notification" in window && Notification.permission === "granted") {
+                                new Notification("에듀스케줄 알람", { body: msg });
+                            }
+                        }
+                    }
+                });
+            }, 30000);
+        }
+
         window.renderDailyView = function() {
             const list = document.getElementById('daily-agenda-list');
             const dateText = document.getElementById('today-date-text');
-            const studentFilter = document.getElementById('student-filter').value;
             
             const today = new Date();
             const todayDayNum = today.getDay();
             dateText.innerText = `(${today.getMonth()+1}월 ${today.getDate()}일 ${dayNames[todayDayNum]}요일)`;
             
             let todaysSch = window.schedules.filter(s => {
-                const matchStudent = studentFilter === 'all' || s.studentId === studentFilter;
+                const matchStudent = window.selectedStudentIds ? window.selectedStudentIds.has(s.studentId) : true;
                 return Number(s.day) === todayDayNum && matchStudent;
             });
             todaysSch.sort((a, b) => a.start.localeCompare(b.start));
@@ -1006,24 +1460,32 @@
             let html = '';
             todaysSch.forEach(sch => {
                 const std = getStudentInfo(sch.studentId);
-                const colorPrefix = typeColors[sch.type].split(' ')[0];
-                const dotColor = colorPrefix.replace('100', '500');
+                const stdColor = window.getStudentColor(sch.studentId);
+                const localAlarm = window.getLocalAlarm(sch.id);
                 
                 html += `
                 <div class="flex items-stretch bg-slate-50 rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:bg-slate-100 transition-colors" onclick="openScheduleModal('${sch.id}')">
-                    <div class="w-1.5 ${colorPrefix} shrink-0"></div>
+                    <div class="w-2 shrink-0" style="background-color: ${stdColor.badgeBg};"></div>
                     <div class="p-3 flex-1 flex flex-col justify-center">
                         <div class="flex justify-between items-start mb-1">
                             <h4 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full ${dotColor}"></span> ${sch.title}
+                                <span class="px-2 py-0.5 rounded-full text-xs text-white font-bold" style="background-color: ${stdColor.badgeBg}">
+                                    ${std.name}
+                                </span>
+                                ${sch.title}
+                                ${((localAlarm.alarmBefore > 0) || (localAlarm.alarmEndBefore > 0)) ? '<span class="text-[10px] text-amber-600 font-normal bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200"><i class="fa-solid fa-bell text-[8px] mr-1"></i>알람</span>' : ''}
                             </h4>
                             <span class="text-xs font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">${sch.start} - ${sch.end}</span>
                         </div>
-                        <div class="flex items-center gap-3 text-xs text-slate-500">
-                            <span class="font-medium text-slate-700"><i class="fa-solid fa-user text-[10px] mr-1"></i>${std.name}</span>
+                        <div class="flex items-center gap-3 text-xs text-slate-500 mb-1">
                             ${sch.memo ? `<span class="truncate"><i class="fa-solid fa-note-sticky text-[10px] mr-1"></i>${sch.memo}</span>` : ''}
                             ${sch.dday ? `<span class="text-red-500 font-bold ml-auto">${calculateDday(sch.dday)}</span>` : ''}
                         </div>
+                        ${(sch.pickupLocation || sch.dropoffLocation) ? `
+                        <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-blue-700 bg-blue-50/80 px-2 py-1 rounded border border-blue-100 mt-1">
+                            ${sch.pickupLocation ? `<span><i class="fa-solid fa-bus text-[10px] mr-1"></i>탑승: <strong>${sch.pickupLocation}</strong></span>` : ''}
+                            ${sch.dropoffLocation ? `<span><i class="fa-solid fa-flag-checkered text-[10px] mr-1"></i>하차: <strong>${sch.dropoffLocation}</strong></span>` : ''}
+                        </div>` : ''}
                     </div>
                 </div>`;
             });
@@ -1052,13 +1514,12 @@
         }
 
         window.checkConflicts = function() {
-            const studentFilter = document.getElementById('student-filter').value;
             const conflictList = document.getElementById('conflict-list');
             const badge = document.getElementById('conflict-badge');
             let issues = [];
             
             window.students.forEach(std => {
-                if (studentFilter !== 'all' && studentFilter !== std.id) return;
+                if (window.selectedStudentIds && !window.selectedStudentIds.has(std.id)) return;
                 for(let day = 0; day <= 6; day++) {
                     const daySchs = window.schedules.filter(s => s.studentId === std.id && Number(s.day) === day);
                     if(daySchs.length < 2) continue;
@@ -1104,24 +1565,14 @@
         }
 
         window.populateStudentDropdowns = function() {
-            const filter = document.getElementById('student-filter');
             const modalSelect = document.getElementById('s-student');
-            const currentFilterVal = filter.value;
-            
-            filter.innerHTML = '<option value="all">전체 학생 일정</option>';
+            if (!modalSelect) return;
             modalSelect.innerHTML = '';
             
             window.students.forEach(std => {
-                filter.innerHTML += `<option value="${std.id}">${std.name} 일정</option>`;
                 modalSelect.innerHTML += `<option value="${std.id}">${std.name} (${std.grade})</option>`;
             });
-            
-            if(Array.from(filter.options).some(opt => opt.value === currentFilterVal)) {
-                filter.value = currentFilterVal;
-            }
         }
-
-        document.getElementById('student-filter').addEventListener('change', () => { renderApp(); });
 
         window.openStudentModal = () => { document.getElementById('student-modal').classList.remove('hidden'); renderStudentList(); }
         window.closeStudentModal = () => document.getElementById('student-modal').classList.add('hidden');
@@ -1134,13 +1585,23 @@
                 return;
             }
             window.students.forEach(std => {
+                const stdColor = window.getStudentColor(std.id);
                 list.innerHTML += `
-                <div class="bg-white p-2.5 rounded border border-slate-200 flex justify-between items-center shadow-sm">
+                <div class="bg-white p-2.5 rounded border border-slate-200 flex justify-between items-center shadow-sm" style="border-left: 4px solid ${stdColor.badgeBg}">
                     <div>
-                        <div class="font-bold text-sm text-slate-800">${std.name} <span class="text-[10px] font-normal text-slate-500 bg-slate-100 px-1 py-0.5 rounded ml-1">${std.grade}</span></div>
-                        ${std.school ? `<div class="text-[10px] text-slate-500 mt-0.5">${std.school}</div>` : ''}
+                        <div class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full border border-black/10 inline-block" style="background-color: ${stdColor.badgeBg}"></span>
+                            ${std.name} 
+                            <span class="text-[10px] font-normal text-slate-500 bg-slate-100 px-1 py-0.5 rounded ml-1">${std.grade}</span>
+                        </div>
+                        ${std.school ? `<div class="text-[10px] text-slate-500 mt-0.5 pl-4.5">${std.school}</div>` : ''}
                     </div>
-                    <button onclick="deleteStudent('${std.id}')" class="text-slate-400 hover:text-red-500 p-1"><i class="fa-regular fa-trash-can"></i></button>
+                    <div class="flex items-center gap-2">
+                        <div class="relative group" title="범례 색상 변경">
+                            <input type="color" value="${stdColor.badgeBg}" onchange="window.updateStudentColor('${std.id}', this.value)" class="w-6 h-6 rounded cursor-pointer border border-slate-300 p-0 bg-transparent">
+                        </div>
+                        <button onclick="deleteStudent('${std.id}')" class="text-slate-400 hover:text-red-500 p-1"><i class="fa-regular fa-trash-can"></i></button>
+                    </div>
                 </div>`;
             });
         }
@@ -1149,21 +1610,26 @@
             e.preventDefault();
             const name = document.getElementById('new-std-name').value.trim();
             if(!name) return;
+            const customColor = document.getElementById('new-std-color').value;
             const newStd = {
                 id: 'std_' + Date.now(),
                 name: name,
                 grade: document.getElementById('new-std-grade').value.trim() || '미분류',
                 school: document.getElementById('new-std-school').value.trim(),
+                color: customColor,
                 roomCode: window.currentRoomCode
             };
             
+            window.students.push(newStd);
+            if (!window.selectedStudentIds) window.selectedStudentIds = new Set();
+            window.selectedStudentIds.add(newStd.id); // Check new student by default
+            saveData();
+            populateStudentDropdowns();
+            renderStudentList();
+            renderApp();
+            
             if(isFirebaseActive && firestoreDb && auth.currentUser) {
-                try { await addDoc(studentsRef, newStd); } catch(err) { fallbackToLocalMode(err.message); }
-            } else {
-                window.students.push(newStd);
-                saveData();
-                populateStudentDropdowns();
-                renderStudentList();
+                try { await addDoc(studentsRef, newStd); } catch(err) { console.warn(err); }
             }
             document.getElementById('add-student-form').reset();
             window.showToast("학생이 추가되었습니다.");
@@ -1171,24 +1637,32 @@
 
         window.deleteStudent = function(id) {
             showConfirmModal("이 학생과 연결된 모든 스케줄이 함께 삭제됩니다. 정말 삭제할까요?", async () => {
+                const targetStd = window.students.find(s => s.id === id);
+                markDeletedId(id);
+                window.students = window.students.filter(s => s.id !== id);
+                if (window.selectedStudentIds) window.selectedStudentIds.delete(id);
+                
+                const targetSchs = window.schedules.filter(s => s.studentId === id);
+                targetSchs.forEach(sch => {
+                    markDeletedId(sch.id);
+                    localStorage.removeItem('eduschedule_alarm_' + sch.id);
+                });
+                window.schedules = window.schedules.filter(s => s.studentId !== id);
+
+                saveData();
+                populateStudentDropdowns();
+                renderStudentList();
+                renderApp();
+
                 if(isFirebaseActive && firestoreDb && auth.currentUser) {
                     try {
-                        const targetStd = window.students.find(s => s.id === id);
                         if(targetStd && targetStd.fbId) await deleteDoc(doc(studentsRef, targetStd.fbId));
-                        const targetSchs = window.schedules.filter(s => s.studentId === id);
                         for(const sch of targetSchs) {
                             if(sch.fbId) await deleteDoc(doc(schedulesRef, sch.fbId));
                         }
-                    } catch(e) { fallbackToLocalMode(e.message); }
-                } else {
-                    window.students = window.students.filter(s => s.id !== id);
-                    window.schedules = window.schedules.filter(s => s.studentId !== id);
-                    saveData();
-                    populateStudentDropdowns();
-                    renderStudentList();
-                    renderApp();
+                    } catch(e) { console.warn(e); }
                 }
-                window.showToast("학생이 삭제되었습니다.");
+                window.showToast("학생과 관련 일정이 삭제되었습니다.");
             }, "학생 삭제");
         }
 
@@ -1205,8 +1679,6 @@
             document.getElementById('btn-copy-schedule').classList.add('hidden');
             document.getElementById('modal-title').innerText = '일정 등록';
             
-            const sf = document.getElementById('student-filter').value;
-            if(sf !== 'all') document.getElementById('s-student').value = sf;
             if(currentDayFilter !== 'all') document.getElementById('s-day').value = currentDayFilter;
 
             if (id) {
@@ -1220,12 +1692,21 @@
                     document.getElementById('s-day').value = sch.day;
                     document.getElementById('s-start').value = sch.start;
                     document.getElementById('s-end').value = sch.end;
+                    document.getElementById('s-pickup').value = sch.pickupLocation || '';
+                    document.getElementById('s-dropoff').value = sch.dropoffLocation || '';
                     document.getElementById('s-memo').value = sch.memo || '';
                     document.getElementById('s-dday').value = sch.dday || '';
+                    
+                    const alarm = window.getLocalAlarm(sch.id);
+                    document.getElementById('s-alarm-before').value = alarm.alarmBefore;
+                    document.getElementById('s-alarm-end-before').value = alarm.alarmEndBefore;
                     
                     document.getElementById('btn-delete-schedule').classList.remove('hidden');
                     document.getElementById('btn-copy-schedule').classList.remove('hidden');
                 }
+            } else {
+                document.getElementById('s-alarm-before').value = '10';
+                document.getElementById('s-alarm-end-before').value = '0';
             }
             document.getElementById('schedule-modal').classList.remove('hidden');
         }
@@ -1254,6 +1735,9 @@
             }
 
             const id = document.getElementById('edit-id').value;
+            const alarmBefore = document.getElementById('s-alarm-before').value;
+            const alarmEndBefore = document.getElementById('s-alarm-end-before').value;
+
             const schData = {
                 studentId: document.getElementById('s-student').value,
                 title: title,
@@ -1261,10 +1745,39 @@
                 day: Number(document.getElementById('s-day').value),
                 start: start,
                 end: end,
+                pickupLocation: document.getElementById('s-pickup').value.trim(),
+                dropoffLocation: document.getElementById('s-dropoff').value.trim(),
                 memo: document.getElementById('s-memo').value.trim(),
                 dday: document.getElementById('s-dday').value,
                 roomCode: window.currentRoomCode
             };
+
+            // Ensure student is active in selected filter
+            if (!window.selectedStudentIds) window.selectedStudentIds = new Set();
+            window.selectedStudentIds.add(schData.studentId);
+
+            // Ensure day is active in settings if hidden
+            if (!window.settings.visibleDays.includes(schData.day)) {
+                window.settings.visibleDays.push(schData.day);
+                window.settings.visibleDays.sort((a,b) => (a===0?7:a) - (b===0?7:b));
+                saveSettingsToLocal();
+            }
+
+            if (id) {
+                const idx = window.schedules.findIndex(s => s.id === id);
+                if(idx > -1) {
+                    schData.id = id;
+                    schData.fbId = window.schedules[idx].fbId;
+                    window.schedules[idx] = schData;
+                }
+                window.saveLocalAlarm(id, alarmBefore, alarmEndBefore);
+            } else {
+                schData.id = 'sch_' + Date.now();
+                window.schedules.push(schData);
+                window.saveLocalAlarm(schData.id, alarmBefore, alarmEndBefore);
+            }
+            saveData();
+            renderApp();
 
             if (isFirebaseActive && firestoreDb && auth.currentUser) {
                 try {
@@ -1272,20 +1785,9 @@
                         const target = window.schedules.find(s => s.id === id);
                         if(target && target.fbId) await updateDoc(doc(schedulesRef, target.fbId), schData);
                     } else {
-                        schData.id = 'sch_' + Date.now();
                         await addDoc(schedulesRef, schData);
                     }
-                } catch(e) { fallbackToLocalMode(e.message); }
-            } else {
-                if (id) {
-                    const idx = window.schedules.findIndex(s => s.id === id);
-                    if(idx > -1) window.schedules[idx] = { ...schData, id: id };
-                } else {
-                    schData.id = 'sch_' + Date.now();
-                    window.schedules.push(schData);
-                }
-                saveData();
-                renderApp();
+                } catch(e) { console.warn(e); }
             }
             closeScheduleModal();
             window.showToast("일정이 안전하게 저장되었습니다.");
@@ -1296,15 +1798,17 @@
                 const id = document.getElementById('edit-id').value;
                 if (!id) return;
 
-                if (isFirebaseActive && firestoreDb && auth.currentUser) {
+                const target = window.schedules.find(s => s.id === id);
+                markDeletedId(id);
+                window.schedules = window.schedules.filter(s => s.id !== id);
+                localStorage.removeItem('eduschedule_alarm_' + id);
+                saveData();
+                renderApp();
+
+                if (isFirebaseActive && firestoreDb && auth.currentUser && target && target.fbId) {
                     try {
-                        const target = window.schedules.find(s => s.id === id);
-                        if(target && target.fbId) await deleteDoc(doc(schedulesRef, target.fbId));
-                    } catch(e) { fallbackToLocalMode(e.message); }
-                } else {
-                    window.schedules = window.schedules.filter(s => s.id !== id);
-                    saveData();
-                    renderApp();
+                        await deleteDoc(doc(schedulesRef, target.fbId));
+                    } catch(e) { console.warn(e); }
                 }
                 closeScheduleModal();
                 window.showToast("일정이 삭제되었습니다.");
@@ -1358,9 +1862,7 @@
         window.closeRoomModal = () => document.getElementById('room-modal').classList.add('hidden');
         
         window.copyRoomCode = function() {
-            navigator.clipboard.writeText(window.currentRoomCode).then(() => {
-                window.showToast("코드가 복사되었습니다!");
-            });
+            window.copyToClipboard(window.currentRoomCode, "코드가 복사되었습니다!");
         }
         
         window.joinRoom = function() {
@@ -1387,25 +1889,25 @@
             }
             const today = new Date();
             let text = `[에듀스케줄 - ${today.getMonth()+1}/${today.getDate()} 일정]\n\n`;
-            const studentFilter = document.getElementById('student-filter').value;
-            let todaysSch = window.schedules.filter(s => Number(s.day) === today.getDay() && (studentFilter === 'all' || s.studentId === studentFilter));
+            let todaysSch = window.schedules.filter(s => Number(s.day) === today.getDay() && (window.selectedStudentIds ? window.selectedStudentIds.has(s.studentId) : true));
             todaysSch.sort((a, b) => a.start.localeCompare(b.start));
             
             todaysSch.forEach(sch => {
                 const std = getStudentInfo(sch.studentId);
                 text += `• ${std.name}: ${sch.title} (${sch.start}~${sch.end})\n`;
+                if(sch.pickupLocation || sch.dropoffLocation) {
+                    text += `  └ 차량: ${sch.pickupLocation ? '탑승('+sch.pickupLocation+') ' : ''}${sch.dropoffLocation ? '하차('+sch.dropoffLocation+')' : ''}\n`;
+                }
                 if(sch.memo) text += `  └ 메모: ${sch.memo}\n`;
             });
             text += `\n*에듀스케줄에서 공유됨`;
             
-            navigator.clipboard.writeText(text).then(() => {
-                window.showToast("일정 요약이 클립보드에 복사되었습니다!");
-            });
+            window.copyToClipboard(text, "일정 요약이 클립보드에 복사되었습니다!");
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadLocalStorage();
             initFirebase();
+            initAlarmChecker();
             window.addEventListener('resize', () => { if(!document.getElementById('view-weekly').classList.contains('hidden')) renderGrid(); });
         });
     </script>
