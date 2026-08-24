@@ -483,6 +483,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { createDataStore } from "./js/data-store.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA5aOOZnCUw0KvlnGBEaavgRTKdiL4y7KI",
@@ -494,6 +495,7 @@
             measurementId: "G-PZRSRCB1WX"
         };
 
+        const dataStore = createDataStore();
         let app, auth, firestoreDb;
         let schedulesRef = null;
         let studentsRef = null;
@@ -551,35 +553,12 @@
             window.showToast(`${std.name} 학생의 색상이 변경되었습니다.`);
         };
         
-        // Load persistent settings safely from localStorage
-        let savedSettings = null;
-        try {
-            savedSettings = JSON.parse(localStorage.getItem('eduschedule_settings'));
-        } catch(e) {}
-
-        window.settings = savedSettings || {
-            visibleDays: [1, 2, 3, 4, 5, 6, 0], // Include ALL 7 days by default so schedules on Sunday are never hidden!
-            startHour: 8,
-            endHour: 22
-        };
+        window.settings = dataStore.loadSettings();
 
         const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
         let currentDayFilter = 'all'; 
 
-        // Treat corrupted or manually edited localStorage values as empty arrays.
-        // This keeps a bad browser cache entry from preventing the app from starting.
-        function parseStoredArray(value) {
-            if (!value) return [];
-            try {
-                const parsed = JSON.parse(value);
-                return Array.isArray(parsed) ? parsed : [];
-            } catch (error) {
-                console.warn('Ignoring invalid local data:', error);
-                return [];
-            }
-        }
-
-        function escapeHtml(value) {
+         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>"']/g, char => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
             })[char]);
@@ -590,17 +569,11 @@
         }
 
         function getDeletedIds() {
-            try {
-                return new Set(JSON.parse(localStorage.getItem('eduschedule_deleted_ids_' + window.currentRoomCode) || '[]'));
-            } catch(e) {
-                return new Set();
-            }
+            return dataStore.getDeletedIds(window.currentRoomCode);
         }
 
         function markDeletedId(id) {
-            const set = getDeletedIds();
-            set.add(id);
-            localStorage.setItem('eduschedule_deleted_ids_' + window.currentRoomCode, JSON.stringify(Array.from(set)));
+            dataStore.markDeletedId(window.currentRoomCode, id);
         }
 
         window.copyToClipboard = function(text, successMsg = "클립보드에 복사되었습니다!") {
@@ -625,15 +598,11 @@
         };
 
         window.getLocalAlarm = function(schId) {
-            const saved = localStorage.getItem('eduschedule_alarm_' + schId);
-            if (saved) {
-                try { return JSON.parse(saved); } catch(e) {}
-            }
-            return { alarmBefore: 10, alarmEndBefore: 0 };
+            return dataStore.getAlarm(schId);
         };
 
         window.saveLocalAlarm = function(schId, alarmBefore, alarmEndBefore) {
-            localStorage.setItem('eduschedule_alarm_' + schId, JSON.stringify({ alarmBefore: Number(alarmBefore), alarmEndBefore: Number(alarmEndBefore) }));
+            dataStore.saveAlarm(schId, alarmBefore, alarmEndBefore);
         };
 
         window.testAlarmNotification = function() {
@@ -854,45 +823,18 @@
             window.knownStudentIds = new Set(window.students.map(s => s.id));
         }
 
-        function findStoredArray(prefix, backupKey) {
-            const primary = localStorage.getItem(prefix + window.currentRoomCode);
-            if (parseStoredArray(primary).length > 0) return primary;
-
-            const backup = localStorage.getItem(backupKey);
-            if (parseStoredArray(backup).length > 0) return backup;
-
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (!key || !key.startsWith(prefix) || key.endsWith('_backup')) continue;
-
-                const candidate = localStorage.getItem(key);
-                if (parseStoredArray(candidate).length > 0) return candidate;
-            }
-            return primary || backup;
-        }
-
         function loadLocalStorage() {
-            const savedSettings = localStorage.getItem('eduschedule_settings');
-            if (savedSettings) {
-                try { window.settings = JSON.parse(savedSettings); } catch(e) {}
-            }
-
-            const savedStudents = findStoredArray('eduschedule_students_', 'eduschedule_students_backup');
-            const savedSchedules = findStoredArray('eduschedule_schedules_', 'eduschedule_schedules_backup');
-
-            window.students = parseStoredArray(savedStudents);
-            window.schedules = parseStoredArray(savedSchedules);
-            
+            window.settings = dataStore.loadSettings();
+            const saved = dataStore.loadState(window.currentRoomCode);
             const deletedSet = getDeletedIds();
-            window.students = window.students.filter(s => s && s.id && !deletedSet.has(s.id));
-            window.schedules = window.schedules.filter(s => s && s.id && !deletedSet.has(s.id));
 
+            window.students = saved.students.filter(s => s && s.id && !deletedSet.has(s.id));
+            window.schedules = saved.schedules.filter(s => s && s.id && !deletedSet.has(s.id));
             syncStudentSelections();
 
-            const isInitialized = localStorage.getItem('eduschedule_initialized_' + window.currentRoomCode);
-            if (!isInitialized && window.students.length === 0 && window.schedules.length === 0) {
+            if (!dataStore.isInitialized(window.currentRoomCode) && window.students.length === 0 && window.schedules.length === 0) {
                 injectSampleData(false);
-                localStorage.setItem('eduschedule_initialized_' + window.currentRoomCode, 'true');
+                dataStore.markInitialized(window.currentRoomCode);
             } else {
                 populateStudentDropdowns();
             }
@@ -900,15 +842,11 @@
         }
 
         window.saveData = function() {
-            localStorage.setItem('eduschedule_students_' + window.currentRoomCode, JSON.stringify(window.students));
-            localStorage.setItem('eduschedule_schedules_' + window.currentRoomCode, JSON.stringify(window.schedules));
-            // Backup keys
-            localStorage.setItem('eduschedule_students_backup', JSON.stringify(window.students));
-            localStorage.setItem('eduschedule_schedules_backup', JSON.stringify(window.schedules));
+            dataStore.saveState(window.currentRoomCode, window.students, window.schedules);
         }
 
         function saveSettingsToLocal() {
-            localStorage.setItem('eduschedule_settings', JSON.stringify(window.settings));
+            dataStore.saveSettings(window.settings);
             updateSettingsUI();
             renderApp();
         }
@@ -934,7 +872,7 @@
                 window.schedules = defaultSchedules;
                 window.selectedStudentIds = new Set(defaultStudents.map(s => s.id));
                 defaultSchedules.forEach(s => window.saveLocalAlarm(s.id, 10, 0));
-                localStorage.setItem('eduschedule_initialized_' + window.currentRoomCode, 'true');
+                dataStore.markInitialized(window.currentRoomCode);
                 saveData();
                 populateStudentDropdowns();
                 renderApp();
