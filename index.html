@@ -523,11 +523,12 @@
             const idx = window.students.findIndex(s => s.id === studentId);
             const defaultPal = studentPalettes[(idx >= 0 ? idx : 0) % studentPalettes.length];
 
-            if (std && std.color) {
+            if (std && /^#[0-9a-f]{6}$/i.test(std.color || '')) {
+                const color = std.color.toLowerCase();
                 return {
-                    badgeBg: std.color,
-                    border: std.color,
-                    lightBg: std.color + '18',
+                    badgeBg: color,
+                    border: color,
+                    lightBg: color + '18',
                     text: '#ffffff',
                     name: '커스텀'
                 };
@@ -537,8 +538,8 @@
 
         window.updateStudentColor = async function(studentId, newColor) {
             const std = window.students.find(s => s.id === studentId);
-            if (!std) return;
-            std.color = newColor;
+            if (!std || !/^#[0-9a-f]{6}$/i.test(newColor || '')) return;
+            std.color = newColor.toLowerCase();
             saveData();
             renderApp();
 
@@ -564,6 +565,29 @@
 
         const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
         let currentDayFilter = 'all'; 
+
+        // Treat corrupted or manually edited localStorage values as empty arrays.
+        // This keeps a bad browser cache entry from preventing the app from starting.
+        function parseStoredArray(value) {
+            if (!value) return [];
+            try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                console.warn('Ignoring invalid local data:', error);
+                return [];
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+            })[char]);
+        }
+
+        function encodeId(value) {
+            return encodeURIComponent(String(value ?? ''));
+        }
 
         function getDeletedIds() {
             try {
@@ -830,41 +854,34 @@
             window.knownStudentIds = new Set(window.students.map(s => s.id));
         }
 
+        function findStoredArray(prefix, backupKey) {
+            const primary = localStorage.getItem(prefix + window.currentRoomCode);
+            if (parseStoredArray(primary).length > 0) return primary;
+
+            const backup = localStorage.getItem(backupKey);
+            if (parseStoredArray(backup).length > 0) return backup;
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key || !key.startsWith(prefix) || key.endsWith('_backup')) continue;
+
+                const candidate = localStorage.getItem(key);
+                if (parseStoredArray(candidate).length > 0) return candidate;
+            }
+            return primary || backup;
+        }
+
         function loadLocalStorage() {
             const savedSettings = localStorage.getItem('eduschedule_settings');
             if (savedSettings) {
                 try { window.settings = JSON.parse(savedSettings); } catch(e) {}
             }
-            
-            let savedStudents = localStorage.getItem('eduschedule_students_' + window.currentRoomCode) || localStorage.getItem('eduschedule_students_backup');
-            let savedSchedules = localStorage.getItem('eduschedule_schedules_' + window.currentRoomCode) || localStorage.getItem('eduschedule_schedules_backup');
-            
-            // Search all other room keys in localStorage if current room has no data
-            if (!savedStudents || JSON.parse(savedStudents).length === 0) {
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && key.startsWith('eduschedule_students_') && !key.endsWith('_backup')) {
-                        const val = localStorage.getItem(key);
-                        if (val && JSON.parse(val).length > 0) { savedStudents = val; break; }
-                    }
-                }
-            }
-            if (!savedSchedules || JSON.parse(savedSchedules).length === 0) {
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && key.startsWith('eduschedule_schedules_') && !key.endsWith('_backup')) {
-                        const val = localStorage.getItem(key);
-                        if (val && JSON.parse(val).length > 0) { savedSchedules = val; break; }
-                    }
-                }
-            }
 
-            if (savedStudents) {
-                try { window.students = JSON.parse(savedStudents); } catch(e) {}
-            }
-            if (savedSchedules) {
-                try { window.schedules = JSON.parse(savedSchedules); } catch(e) {}
-            }
+            const savedStudents = findStoredArray('eduschedule_students_', 'eduschedule_students_backup');
+            const savedSchedules = findStoredArray('eduschedule_schedules_', 'eduschedule_schedules_backup');
+
+            window.students = parseStoredArray(savedStudents);
+            window.schedules = parseStoredArray(savedSchedules);
             
             const deletedSet = getDeletedIds();
             window.students = window.students.filter(s => s && s.id && !deletedSet.has(s.id));
@@ -1007,12 +1024,12 @@
                 label.className = `inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border transition-all cursor-pointer shadow-2xs select-none ${isChecked ? 'bg-white border-slate-300 text-slate-800 font-bold' : 'bg-slate-100 border-slate-200 text-slate-400 font-normal opacity-60'}`;
 
                 label.innerHTML = `
-                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="window.toggleStudentSelection('${std.id}')" class="accent-blue-600 rounded w-3.5 h-3.5 cursor-pointer">
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="window.toggleStudentSelection(decodeURIComponent('${encodeId(std.id)}'))" class="accent-blue-600 rounded w-3.5 h-3.5 cursor-pointer">
                     <div class="relative flex items-center justify-center group" title="클릭하여 범례 색상 변경">
                         <span class="w-3.5 h-3.5 rounded-full inline-block border border-black/10 shrink-0" style="background-color: ${stdColor.badgeBg}"></span>
-                        <input type="color" value="${stdColor.badgeBg}" onchange="window.updateStudentColor('${std.id}', this.value)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                        <input type="color" value="${stdColor.badgeBg}" onchange="window.updateStudentColor(decodeURIComponent('${encodeId(std.id)}'), this.value)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
                     </div>
-                    <span>${std.name} (${std.grade})</span>
+                    <span>${escapeHtml(std.name)} (${escapeHtml(std.grade)})</span>
                 `;
                 legendList.appendChild(label);
             });
@@ -1076,15 +1093,16 @@
             const target = window.schedules[schIndex];
             const schData = { ...target, day: newDay, start: newStart, end: newEnd };
             
+            // Update the local view first. The Firestore snapshot will reconcile it later.
+            window.schedules[schIndex] = schData;
+            saveData();
+
             if (isFirebaseActive && firestoreDb && auth.currentUser && target.fbId) {
                 try {
                     await updateDoc(doc(schedulesRef, target.fbId), { day: newDay, start: newStart, end: newEnd });
-                } catch(e) { 
-                    fallbackToLocalMode(e.message); 
+                } catch(e) {
+                    fallbackToLocalMode(e.message);
                 }
-            } else {
-                window.schedules[schIndex] = schData;
-                saveData();
             }
             renderApp();
             window.showToast("일정이 이동되었습니다.");
@@ -1245,18 +1263,18 @@
 
                 const studentInfo = getStudentInfo(sch.studentId);
                 const localAlarm = window.getLocalAlarm(sch.id);
-                let html = `<div class="font-bold text-xs truncate leading-tight pointer-events-none">${sch.title}</div>`;
+                let html = `<div class="font-bold text-xs truncate leading-tight pointer-events-none">${escapeHtml(sch.title)}</div>`;
                 if (heightPx > 40) {
                     html += `<div class="mt-0.5 truncate pointer-events-none">
                         <span class="inline-block px-1.5 py-0.2 text-[9px] font-extrabold text-white rounded-full shadow-xs" style="background-color: ${stdColor.badgeBg};">
-                            ${studentInfo.name}
+                            ${escapeHtml(studentInfo.name)}
                         </span>
                     </div>`;
                     if(sch.pickupLocation && heightPx > 58) {
-                        html += `<div class="text-[9px] opacity-75 truncate pointer-events-none mt-0.5"><i class="fa-solid fa-bus text-[8px] mr-0.5"></i>탑승: ${sch.pickupLocation}</div>`;
+                        html += `<div class="text-[9px] opacity-75 truncate pointer-events-none mt-0.5"><i class="fa-solid fa-bus text-[8px] mr-0.5"></i>탑승: ${escapeHtml(sch.pickupLocation)}</div>`;
                     }
                     if(sch.dropoffLocation && heightPx > 72) {
-                        html += `<div class="text-[9px] opacity-75 truncate pointer-events-none"><i class="fa-solid fa-flag-checkered text-[8px] mr-0.5"></i>하차: ${sch.dropoffLocation}</div>`;
+                        html += `<div class="text-[9px] opacity-75 truncate pointer-events-none"><i class="fa-solid fa-flag-checkered text-[8px] mr-0.5"></i>하차: ${escapeHtml(sch.dropoffLocation)}</div>`;
                     }
                     if(((localAlarm.alarmBefore > 0) || (localAlarm.alarmEndBefore > 0)) && heightPx > 86) {
                         html += `<div class="text-[9px] text-amber-700 truncate pointer-events-none"><i class="fa-solid fa-bell text-[8px] mr-0.5"></i>알람</div>`;
@@ -1464,27 +1482,27 @@
                 const localAlarm = window.getLocalAlarm(sch.id);
                 
                 html += `
-                <div class="flex items-stretch bg-slate-50 rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:bg-slate-100 transition-colors" onclick="openScheduleModal('${sch.id}')">
+                <div class="flex items-stretch bg-slate-50 rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:bg-slate-100 transition-colors" onclick="openScheduleModal(decodeURIComponent('${encodeId(sch.id)}'))">
                     <div class="w-2 shrink-0" style="background-color: ${stdColor.badgeBg};"></div>
                     <div class="p-3 flex-1 flex flex-col justify-center">
                         <div class="flex justify-between items-start mb-1">
                             <h4 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
                                 <span class="px-2 py-0.5 rounded-full text-xs text-white font-bold" style="background-color: ${stdColor.badgeBg}">
-                                    ${std.name}
+                                    ${escapeHtml(std.name)}
                                 </span>
-                                ${sch.title}
+                                ${escapeHtml(sch.title)}
                                 ${((localAlarm.alarmBefore > 0) || (localAlarm.alarmEndBefore > 0)) ? '<span class="text-[10px] text-amber-600 font-normal bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200"><i class="fa-solid fa-bell text-[8px] mr-1"></i>알람</span>' : ''}
                             </h4>
                             <span class="text-xs font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">${sch.start} - ${sch.end}</span>
                         </div>
                         <div class="flex items-center gap-3 text-xs text-slate-500 mb-1">
-                            ${sch.memo ? `<span class="truncate"><i class="fa-solid fa-note-sticky text-[10px] mr-1"></i>${sch.memo}</span>` : ''}
+                            ${sch.memo ? `<span class="truncate"><i class="fa-solid fa-note-sticky text-[10px] mr-1"></i>${escapeHtml(sch.memo)}</span>` : ''}
                             ${sch.dday ? `<span class="text-red-500 font-bold ml-auto">${calculateDday(sch.dday)}</span>` : ''}
                         </div>
                         ${(sch.pickupLocation || sch.dropoffLocation) ? `
                         <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-blue-700 bg-blue-50/80 px-2 py-1 rounded border border-blue-100 mt-1">
-                            ${sch.pickupLocation ? `<span><i class="fa-solid fa-bus text-[10px] mr-1"></i>탑승: <strong>${sch.pickupLocation}</strong></span>` : ''}
-                            ${sch.dropoffLocation ? `<span><i class="fa-solid fa-flag-checkered text-[10px] mr-1"></i>하차: <strong>${sch.dropoffLocation}</strong></span>` : ''}
+                            ${sch.pickupLocation ? `<span><i class="fa-solid fa-bus text-[10px] mr-1"></i>탑승: <strong>${escapeHtml(sch.pickupLocation)}</strong></span>` : ''}
+                            ${sch.dropoffLocation ? `<span><i class="fa-solid fa-flag-checkered text-[10px] mr-1"></i>하차: <strong>${escapeHtml(sch.dropoffLocation)}</strong></span>` : ''}
                         </div>` : ''}
                     </div>
                 </div>`;
@@ -1551,9 +1569,9 @@
                     <div class="p-3 rounded-lg border ${bg} flex items-start gap-3">
                         <div class="pt-1">${icon}</div>
                         <div>
-                            <h4 class="font-bold text-slate-800 text-sm">${iss.student} 학생 (${iss.day}요일)</h4>
-                            <p class="text-xs text-slate-600 mt-1"><span class="font-semibold">${iss.sch1}</span> ➔ <span class="font-semibold">${iss.sch2}</span></p>
-                            <p class="text-xs font-bold text-red-600 mt-1">${iss.msg}</p>
+                            <h4 class="font-bold text-slate-800 text-sm">${escapeHtml(iss.student)} 학생 (${escapeHtml(iss.day)}요일)</h4>
+                            <p class="text-xs text-slate-600 mt-1"><span class="font-semibold">${escapeHtml(iss.sch1)}</span> ➔ <span class="font-semibold">${escapeHtml(iss.sch2)}</span></p>
+                            <p class="text-xs font-bold text-red-600 mt-1">${escapeHtml(iss.msg)}</p>
                         </div>
                     </div>`;
                 });
@@ -1570,7 +1588,7 @@
             modalSelect.innerHTML = '';
             
             window.students.forEach(std => {
-                modalSelect.innerHTML += `<option value="${std.id}">${std.name} (${std.grade})</option>`;
+                modalSelect.innerHTML += `<option value="${escapeHtml(std.id)}">${escapeHtml(std.name)} (${escapeHtml(std.grade)})</option>`;
             });
         }
 
@@ -1591,16 +1609,16 @@
                     <div>
                         <div class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
                             <span class="w-3 h-3 rounded-full border border-black/10 inline-block" style="background-color: ${stdColor.badgeBg}"></span>
-                            ${std.name} 
-                            <span class="text-[10px] font-normal text-slate-500 bg-slate-100 px-1 py-0.5 rounded ml-1">${std.grade}</span>
+                            ${escapeHtml(std.name)} 
+                            <span class="text-[10px] font-normal text-slate-500 bg-slate-100 px-1 py-0.5 rounded ml-1">${escapeHtml(std.grade)}</span>
                         </div>
-                        ${std.school ? `<div class="text-[10px] text-slate-500 mt-0.5 pl-4.5">${std.school}</div>` : ''}
+                        ${std.school ? `<div class="text-[10px] text-slate-500 mt-0.5 pl-4.5">${escapeHtml(std.school)}</div>` : ''}
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="relative group" title="범례 색상 변경">
-                            <input type="color" value="${stdColor.badgeBg}" onchange="window.updateStudentColor('${std.id}', this.value)" class="w-6 h-6 rounded cursor-pointer border border-slate-300 p-0 bg-transparent">
+                            <input type="color" value="${stdColor.badgeBg}" onchange="window.updateStudentColor(decodeURIComponent('${encodeId(std.id)}'), this.value)" class="w-6 h-6 rounded cursor-pointer border border-slate-300 p-0 bg-transparent">
                         </div>
-                        <button onclick="deleteStudent('${std.id}')" class="text-slate-400 hover:text-red-500 p-1"><i class="fa-regular fa-trash-can"></i></button>
+                        <button onclick="deleteStudent(decodeURIComponent('${encodeId(std.id)}'))" class="text-slate-400 hover:text-red-500 p-1"><i class="fa-regular fa-trash-can"></i></button>
                     </div>
                 </div>`;
             });
